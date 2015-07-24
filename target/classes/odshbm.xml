@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Generated 20 Julai 2010 11:40:18 AM by Hibernate Tools 3.2.5.Beta -->
+<hibernate-mapping>
+	<!-- select * from syscat.columns where tabname = your_tabname -->
+	<sql-query name="getAllTable" read-only="true">
+   		select * from syscat.tables
+	</sql-query>
+	
+   	<sql-query name="getCustomStgUsers" read-only="true">
+   		<![CDATA[ SELECT FIRST_NAME , LAST_NAME, MOBILE,  EMAIL, ACCOUNT_STATUS, 
+   		AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, CREATED_DATE
+ 		FROM PSE.CUSTOM_STG_USER WHERE cast(CREATED_DATE AS timestamp) > cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp)]]>
+	</sql-query>
+	
+	<sql-query name="getCustomStgUserRoles" read-only="true">
+   		<![CDATA[ SELECT ID_NRIC, ROLE_NAME, CREATED_DATE FROM PSE.CUSTOM_STG_USER_ROLE
+   		WHERE cast(CREATED_DATE AS timestamp) > cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp)]]>
+	</sql-query>
+	
+</hibernate-mapping>

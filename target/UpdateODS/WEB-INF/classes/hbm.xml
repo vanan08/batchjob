@@ -1,0 +1,173 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Generated 20 Julai 2010 11:40:18 AM by Hibernate Tools 3.2.5.Beta -->
+<hibernate-mapping>
+   	<sql-query name="get_document" read-only="true">
+   		SELECT * FROM qrtz_cron_triggers
+	</sql-query>
+	
+	<sql-query name="insertSTGUserRole" read-only="true">
+   		INSERT INTO custom_stg_user_role(
+            id, id_nric, role_name, created_date)
+    	VALUES (uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
+    		:id_nric, :role_name, 
+    		cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp));
+	</sql-query>
+	
+	<sql-query name="insertSTGUser" read-only="true">
+   		INSERT INTO custom_stg_user(
+            id_nric, first_name, last_name, email, account_status, mobile, 
+            agent_code, agency, need2fa, needtnc, user_type, user__sub_type, 
+            created_date)
+    	VALUES (:id_nric, :first_name, :last_name, :email, :account_status, :mobile, 
+            :agent_code, :agency, :need2fa, :needtnc, :user_type, :user__sub_type, 
+            cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp));
+	</sql-query>
+	
+	<sql-query name="getMaxCreatedDateSTGUser" read-only="true">
+   		SELECT cast(max(created_date) as timestamp) FROM CUSTOM_STG_USER
+	</sql-query>
+	
+	<sql-query name="getMaxCreatedDateSTGUserRole" read-only="true">
+   		SELECT cast(max(created_date) as timestamp) FROM CUSTOM_STG_USER_ROLE
+	</sql-query>
+	
+	<sql-query name="getUserRealm" read-only="true">
+   		SELECT USER_ID, REALM_ID FROM USER_ENTITY
+	</sql-query>
+	<sql-query name="insertToCustomUser" read-only="true">
+   		INSERT INTO CUSTOM_USER(CUSTOM_USER_ID, USER_ENTITY_ID, ACCEPTED_TNC, CREATED_BY, CREATED_DATE)
+   		(
+   			SELECT uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)),
+   			ID, 'N', 'admin', cast(created_date AS timestamp)
+			FROM
+			USER_ENTITY
+   		);
+	</sql-query>
+	
+	<sql-query name="getUserTypeRoles" read-only="true">
+   		SELECT cast(approle.custom_user_type_id AS text), cast(approle.role_id AS text), cast(usrtype.user_type AS text)
+   		FROM public.custom_user_type_app_role approle, public.custom_user_type usrtype
+   		WHERE usrtype.id = approle.custom_user_type_id;
+	</sql-query>
+	
+	<sql-query name="getNewUsers" read-only="true">
+   		SELECT cast(id_nric AS text), cast(user_type AS text)
+	FROM custom_stg_user 
+	WHERE cast(created_date AS timestamp) > 
+		(SELECT cast(created_date AS timestamp) FROM USER_ENTITY WHERE created_date IS NOT NULL
+		ORDER BY created_date DESC LIMIT 1);
+	</sql-query>
+	
+	<sql-query name="getNewUserId" read-only="true">
+   		SELECT cast(ID AS text), cast(USERNAME AS text) from USER_ENTITY;
+	</sql-query>
+	
+	<sql-query name="getUserType" read-only="true">
+   		SELECT cast(user_type AS text), cast(id AS text), cast(custom_user_type_id AS text) from custom_user_type;
+	</sql-query>
+	
+	<sql-query name="getUserSubType" read-only="true">
+   		SELECT cast(user_sub_type AS text), cast(id AS text), cast(custom_user_type_id AS text) from custom_user_type;
+	</sql-query>
+	
+	<sql-query name="count_new_rows" read-only="true">
+   		SELECT count(*) as count_row_input
+	FROM custom_stg_user where cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1);;
+	</sql-query>
+	
+	<sql-query name="migrate_user_entity" read-only="true">
+		WITH user_tmp AS (
+			INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, CREATED_DATE)
+			(SELECT uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
+			 (SELECT ID FROM REALM WHERE lower(NAME) = 'pse') AS REALM_ID,
+			 ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, cast(now() AS timestamp)
+			 FROM custom_stg_user 
+			 WHERE cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1)
+			 AND ID_NRIC NOT IN (SELECT USERNAME FROM USER_ENTITY)
+			)
+		    RETURNING 1
+		)
+		SELECT count(*) as count_rows_inserted FROM user_tmp;
+	</sql-query>
+	
+	<sql-query name="check_custom_user_entity" read-only="true">
+		SELECT DISTINCT count(*) FROM custom_stg_user WHERE user_type NOT IN (SELECT DISTINCT user_type FROM custom_user_type)
+    </sql-query>
+    
+	<sql-query name="migrate_role" read-only="true">
+		WITH custom_role_tmp AS (
+			INSERT INTO keycloak_role(ID, name, created_date) 
+			(SELECT DISTINCT uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), role_name, cast(now() AS text) FROM custom_stg_user_role WHERE role_name NOT IN 
+			(SELECT DISTINCT name FROM keycloak_role))
+			RETURNING 1
+		)
+		SELECT count(*) as num_role_inserted FROM custom_role_tmp;
+    </sql-query>
+    
+    <sql-query name="user_type_not_mapping" read-only="true">
+		SELECT cast(user_type AS text), cast(user__sub_type AS text) as user_sub_type FROM custom_stg_user 
+		WHERE user_type NOT IN (SELECT A.user_type
+		FROM custom_user_type A, custom_user_subtype B WHERE A.id = B.custom_user_type_id )
+    </sql-query>
+    
+    <sql-query name="user_sub_type_not_mapping" read-only="true">
+		SELECT cast(user__sub_type AS text), cast(user_type AS text) FROM custom_stg_user 
+		WHERE user__sub_type NOT IN 
+		(SELECT B.user_sub_type 
+		FROM custom_user_type A, custom_user_subtype B 
+		WHERE A.id = B.custom_user_type_id  )
+    </sql-query>
+    
+    <sql-query name="insertToCustomUserType" read-only="true">
+			INSERT INTO custom_user_type(id, user_type, created_date, updated_date) 
+			values(:uuid, :user_type, cast(now() AS timestamp), cast(now() AS timestamp))
+    </sql-query>
+    
+    <sql-query name="insertToCustomUserSubType" read-only="true">
+			INSERT INTO custom_user_subtype(
+            id, custom_user_type_id, user_sub_type, created_date, updated_date)
+    		values (:id, :custom_user_type_id, :user_sub_type, cast(now() AS timestamp), cast(now() AS timestamp));
+    </sql-query>
+    
+    <sql-query name="getUserTypeId" read-only="true">
+			select cast(id AS text) from custom_user_type
+			where user_type = :user_type
+    </sql-query>
+    
+    
+    <sql-query name="getNewRolesFromStg" read-only="true">
+			SELECT cast(role_name AS text) as rolename FROM custom_stg_user_role WHERE role_name NOT IN (SELECT DISTINCT name FROM keycloak_role);
+    </sql-query>
+    
+    <sql-query name="getPSERealmId" read-only="true">
+			SELECT cast(id AS text) as realm_id, cast(name AS text) as realm FROM realm r WHERE name='pse';
+    </sql-query>
+    
+    <sql-query name="getListAppsBelongRealm" read-only="true">
+			SELECT cast(realm_id AS text) as app_id FROM realm_application WHERE application_id=(SELECT r.id FROM realm r WHERE name='pse');
+    </sql-query>
+    
+    <sql-query name="insertKeycloakRole" read-only="true">
+    			INSERT INTO keycloak_role(
+            		id, app_realm_constraint, application_role, name, 
+            		realm_id, application, created_date)
+    			VALUES (:id, :app_realm_constraint, :application_role, :name, 
+            		:realm_id, :application, cast(now() AS timestamp));						
+     </sql-query>
+     
+      <sql-query name="insertUserRoleMapping" read-only="true">
+    			INSERT INTO user_role_mapping(
+            	role_id, user_id)
+    			VALUES (:role_id, :user_id);						
+     </sql-query>
+     
+      <sql-query name="getUserRoleMapping" read-only="true">
+    			SELECT cast(role_id AS text), cast(user_id AS text) FROM user_role_mapping;						
+     </sql-query>
+     
+     <sql-query name="getRoleId" read-only="true">
+			SELECT cast(id AS text) role_id, cast(name AS text) role_name FROM keycloak_role;
+    </sql-query>
+</hibernate-mapping>
