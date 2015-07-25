@@ -59,46 +59,12 @@ xmlns:security="http://www.springframework.org/schema/security"
 	<context:component-scan base-package="com.mkyong.quartz"/>
 	<tx:annotation-driven transaction-manager="transactionManager"/>
 	
-	
-	<bean id="odsstagingDataSource" class="org.springframework.jndi.JndiObjectFactoryBean">
-      <property name="jndiName" value="java:jboss/datasources/ODSStagingDS"/>
-    </bean>
-    
-	<bean id="odsSessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
-		 <property name="dataSource" ref="odsstagingDataSource"/>
-		<property name="hibernateProperties">
-            <props>
-                <prop key="hibernate.hbm2ddl.auto">create</prop>
-                <prop key="hibernate.dialect">org.hibernate.dialect.PostgreSQLDialect</prop>
-                <prop key="hibernate.show_sql">true</prop>
-                <prop key="hibernate.generate_statistics">true</prop>
-            </props>
-        </property>
-        <property name="mappingResources">
-			<list>
-				<value>odshbm.xml</value>
-			</list>
-		</property>
-	</bean>
-	
-	<bean id="odsTransactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
-		<property name="odsSessionFactory" ref="odsSessionFactory"/>
-	</bean>
-	
-	<bean id="synODSDB" class="com.mkyong.service.impl.SynODSDBImpl" >
-		<property name="odsSessionFactory" ref="odsSessionFactory" />
-	</bean>
-	
-	<context:component-scan base-package="com.mkyong.quartz"/>
-	<tx:annotation-driven transaction-manager="odsTransactionManager"/>
-	
 	<!-- Spring Quartz Scheduler job -->
 	<bean name="schedulerJob" class="org.springframework.scheduling.quartz.JobDetailBean">
 		<property name="jobClass" value="com.mkyong.quartz.SchedulerJob"  />
 		<property name="jobDataAsMap">
 	        <map>
 	            <entry key="synDB" value-ref="synDB" />
-	            <entry key="synODSDB" value-ref="synODSDB" />
 	        </map>
 	    </property>
 	</bean>

@@ -1,5 +1,8 @@
 package com.mkyong.quartz;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
@@ -8,21 +11,15 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.scheduling.quartz.QuartzJobBean;
 
+import com.ibm.db2.jcc.DB2Driver;
 import com.mkyong.service.SynDB;
-import com.mkyong.service.SynODSDB;
 
 public class SchedulerJob extends QuartzJobBean {
 
 	private SynDB synDB;
-	private SynODSDB synODSDB;
-
-	// public UserBo getUserBo() {
-	// return userBo;
-	// }
-	//
-	// public void setUserBo(UserBo userBo) {
-	// this.userBo = userBo;
-	// }
+	Connection connection = null;
+	PreparedStatement statement = null;
+	ResultSet rs = null;
 
 	protected void executeInternal(JobExecutionContext context)
 			throws JobExecutionException {
@@ -32,11 +29,6 @@ public class SchedulerJob extends QuartzJobBean {
 				+ Calendar.getInstance().getTime());
 
 		synDB = (SynDB) context.getMergedJobDataMap().get("synDB");
-		synODSDB = (SynODSDB) context.getMergedJobDataMap().get("synODSDB");
-
-		if (synODSDB == null) {
-			System.out.println("Can not get connect to ODSDB...");
-		}
 
 		String eable = synDB.getEnableProperties("enable");
 		if (eable.equalsIgnoreCase("N")) {
@@ -47,56 +39,42 @@ public class SchedulerJob extends QuartzJobBean {
 		/***
 		 * Sync DB2
 		 */
-
-		String oldCreatedDateSTGUser = synDB.getMaxCreatedDateSTGUser();
-		String oldCreatedDateSTGUserRole = synDB
-				.getMaxCreatedDateStgUserRoles();
-
-		if (oldCreatedDateSTGUser != null) {
-			oldCreatedDateSTGUser = "1970-01-01 :00:00:00";
-		}
-		if (oldCreatedDateSTGUserRole != null) {
-			oldCreatedDateSTGUserRole = "1970-01-01 :00:00:00";
-		}
-		if (synODSDB != null) {
-			List<Object[]> lsSTGUsers = synODSDB
-					.getCustomStgUsers(oldCreatedDateSTGUser);
-			for (Object[] row : lsSTGUsers) {
-				String id_nric = (String) row[0];
-				String first_name = (String) row[1];
-				String last_name = (String) row[2];
-				String email = (String) row[3];
-				String account_status = (String) row[4];
-				String mobile = (String) row[5];
-				String agent_code = (String) row[6];
-				String agency = (String) row[7];
-				String need2fa = (String) row[8];
-				String needtnc = (String) row[9];
-				String user_type = (String) row[10];
-				String user__sub_type = (String) row[11];
-				synDB.insertSTGUser(id_nric, first_name, last_name, email,
-						account_status, mobile, agent_code, agency, need2fa,
-						needtnc, user_type, user__sub_type);
-			}
-
-			List<Object[]> lsSTGUserRoles = synODSDB
-					.getCustomStgUserRoles(oldCreatedDateSTGUserRole);
-
-			for (Object[] row : lsSTGUserRoles) {
-				String id_nric = (String) row[0];
-				String role_name = (String) row[1];
-				synDB.insertSTGUserRole(id_nric, role_name);
-			}
-		}
+		// getDataFromDB2();
+		//
+		// String oldCreatedDateSTGUser = synDB.getMaxCreatedDateSTGUser();
+		// String oldCreatedDateSTGUserRole = synDB
+		// .getMaxCreatedDateStgUserRoles();
+		//
+		// if (oldCreatedDateSTGUser != null) { oldCreatedDateSTGUser =
+		// "1970-01-01 :00:00:00"; } if (oldCreatedDateSTGUserRole != null) {
+		// oldCreatedDateSTGUserRole = "1970-01-01 :00:00:00"; } if (synODSDB !=
+		// null) { List<Object[]> lsSTGUsers =
+		// getCustomStgUsers(oldCreatedDateSTGUser); for (Object[] row :
+		// lsSTGUsers) { String id_nric = (String) row[0]; String first_name =
+		// (String) row[1]; String last_name = (String) row[2]; String email =
+		// (String) row[3]; String account_status = (String) row[4]; String
+		// mobile = (String) row[5]; String agent_code = (String) row[6]; String
+		// agency = (String) row[7]; String need2fa = (String) row[8]; String
+		// needtnc = (String) row[9]; String user_type = (String) row[10];
+		// String user__sub_type = (String) row[11];
+		// synDB.insertSTGUser(id_nric, first_name, last_name, email,
+		// account_status, mobile, agent_code, agency, need2fa, needtnc,
+		// user_type, user__sub_type); }
+		//
+		// List<Object[]> lsSTGUserRoles =
+		// getCustomStgUserRoles(oldCreatedDateSTGUserRole);
+		//
+		// for (Object[] row : lsSTGUserRoles) { String id_nric = (String)
+		// row[0]; String role_name = (String) row[1];
+		// synDB.insertSTGUserRole(id_nric, role_name); } }
 		/***
 		 * TODO: Get all new user
 		 */
-
 		List<Object[]> lsNewUsers = synDB.getNewUsers();
-
 		/***************
 		 * update user_entity
 		 */
+
 		int new_rows = synDB.countNewRows();
 		System.out.println("Get new rows count: " + new_rows);
 		if (new_rows > 0) {
@@ -232,5 +210,61 @@ public class SchedulerJob extends QuartzJobBean {
 			id[i] = chars[r.nextInt(chars.length)];
 		}
 		return new String(id);
+	}
+
+	private List<Object[]> getCustomStgUsers() {
+		String ServerName = "10.163.170.78";
+		int PortNumber = 55702;
+		String DatabaseName = "ODSSG";
+
+		java.util.Properties properties = new java.util.Properties();
+
+		properties.put("user", "raisapp");
+		properties.put("password", "password");
+		properties.put("sslConnection", "true");
+		System.setProperty("javax.net.ssl.trustStore",
+				"/jboss/jboss-eap-6.3/cacerts");
+		System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+		System.setProperty("db2.jcc.charsetDecoderEncoder", "3");
+		String url = "jdbc:db2://" + ServerName + ":" + PortNumber + "/"
+				+ DatabaseName;
+
+		java.sql.Connection con = null;
+		try {
+			new DB2Driver();
+		} catch (Exception e) {
+			System.out.println("Error: failed to load Db2 jcc driver.");
+		}
+
+		try {
+			System.out.println("url: " + url);
+			con = java.sql.DriverManager.getConnection(url, properties);
+			try {
+				String sql = "SELECT ID_NRIC, FIRST_NAME, LAST_NAME FROM PSE.CUSTOM_STG_USER ";
+				// + "WHERE CREATED_DATE > "
+				// + "date(to_date(?,'DD-MM-YYYY HH:MI:SS'));";
+
+				java.sql.Statement ps = con.createStatement();
+				System.out.println("select is executeQuery");
+				java.sql.ResultSet rs = ps.executeQuery(sql);
+				System.out.println("get data....");
+				while (rs.next()) {
+					System.out.println(rs.getString(1));
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.out.println("select is failing1");
+			}
+
+			con.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+	
+	private List<Object[]> getCustomStgUserRoles() {
+		return null;
 	}
 }

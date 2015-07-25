@@ -2,6 +2,9 @@
 <classpath>
 	<classpathentry exported="true" kind="lib" path="libs/javaee.jar"/>
 	<classpathentry exported="true" kind="lib" path="libs/java-mail-1.4.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/nvan/Desktop/BATCH_JOB/lib/db2jcc_javax.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/nvan/Desktop/BATCH_JOB/lib/db2jcc_license_cu.jar"/>
+	<classpathentry exported="true" kind="lib" path="/Users/nvan/Desktop/BATCH_JOB/lib/db2jcc4.jar"/>
 	<classpathentry kind="src" output="target/classes" path="src/main/java">
 		<attributes>
 			<attribute name="optional" value="true"/>
