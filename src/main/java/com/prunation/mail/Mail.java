@@ -22,12 +22,6 @@ import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 
 public class Mail {
-	protected int noRecordInput;
-	protected int noRecordProcessed;
-	protected int noRecordNotProcessed;
-	protected String remarkError;
-	protected String processDuration;
-
 	private String emailFrom;
 	private String emailTo;
 	private String subject;
@@ -35,31 +29,16 @@ public class Mail {
 	private String port;
 	private String username;
 	private String password;
+	private String infomation;
+	private String logfilePath;
 
 	public Mail() {
 	}
 
-	public Mail(int noRecordInput, int noRecordProcessed,
-			int noRecordNotProcessed, String remarkError, String processDuration) {
-		super();
-		this.noRecordInput = noRecordInput;
-		this.noRecordProcessed = noRecordProcessed;
-		this.noRecordNotProcessed = noRecordNotProcessed;
-		this.remarkError = remarkError;
-		this.processDuration = processDuration;
-	}
 
-	public Mail(int noRecordInput, int noRecordProcessed,
-			int noRecordNotProcessed, String remarkError,
-			String processDuration, String emailFrom, String emailTo,
+	public Mail(String emailFrom, String emailTo,
 			String subject, String host, String port, String username,
-			String password) {
-		super();
-		this.noRecordInput = noRecordInput;
-		this.noRecordProcessed = noRecordProcessed;
-		this.noRecordNotProcessed = noRecordNotProcessed;
-		this.remarkError = remarkError;
-		this.processDuration = processDuration;
+			String password, String infomation, String logfilePath) {
 		this.emailFrom = emailFrom;
 		this.emailTo = emailTo;
 		this.subject = subject;
@@ -67,47 +46,17 @@ public class Mail {
 		this.port = port;
 		this.username = username;
 		this.password = password;
+		this.infomation = infomation;
+		this.logfilePath = logfilePath;
+		System.out.println("emailfrom = " + emailFrom);
+		System.out.println("emailto = " + emailTo);
+		System.out.println("username = " + username);
+		System.out.println("password = " + password);
+		System.out.println("infomation = " + infomation);
+		System.out.println("subject = " + subject);
+		System.out.println("logfilePath = " + logfilePath);
 	}
 
-	public String getProcessDuration() {
-		return processDuration;
-	}
-
-	public void setprocessDuration(String processDuration) {
-		this.processDuration = processDuration;
-	}
-
-	public int getNoRecordInput() {
-		return noRecordInput;
-	}
-
-	public void setNoRecordInput(int noRecordInput) {
-		this.noRecordInput = noRecordInput;
-	}
-
-	public int getNoRecordProcessed() {
-		return noRecordProcessed;
-	}
-
-	public void setNoRecordProcessed(int noRecordProcessed) {
-		this.noRecordProcessed = noRecordProcessed;
-	}
-
-	public int getNoRecordNotProcessed() {
-		return noRecordNotProcessed;
-	}
-
-	public void setNoRecordNotProcessed(int noRecordNotProcessed) {
-		this.noRecordNotProcessed = noRecordNotProcessed;
-	}
-
-	public String getRemarkError() {
-		return remarkError;
-	}
-
-	public void setRemarkError(String remarkError) {
-		this.remarkError = remarkError;
-	}
 
 	public String getEmailFrom() {
 		return emailFrom;
@@ -133,18 +82,6 @@ public class Mail {
 		this.subject = subject;
 	}
 
-	public String toString() {
-		String content = "No of rows (Input): " + noRecordInput + "\n";
-		content += "No of Records (Processed): " + noRecordProcessed + "\n";
-		content += "No of Records (Not Processed): "
-				+ (noRecordInput - noRecordProcessed) + "\n";
-		content += "ProcessDuration: " + processDuration + "\n";
-
-		content += "Remark/Error: " + remarkError + "\n";
-
-		return content;
-	}
-
 	
 	private class SMTPAuthenticator extends Authenticator
 	{
@@ -155,9 +92,7 @@ public class Mail {
 	}
 	
 	public void send() {
-		readConfig();
 		try {
-
 		    Properties props = new Properties();
 			props.put("mail.smtp.user", this.username);
 			props.put("mail.smtp.host", this.host);
@@ -180,15 +115,15 @@ public class Mail {
 			msg.addRecipient(Message.RecipientType.TO, new InternetAddress(this.emailTo));
 			
 			BodyPart messageBodyPart = new MimeBodyPart();
-			String content = "Dear admin, \n\nPls, See about status of updating ODS data into Keycloak DB:\n\n"+ this.toString();
+			String content = "Dear admin, \n\nPls, See about status of updating ODS data into Keycloak DB:\n\n"+ infomation;
 			content+= "\n\n\n\nThanks & BR,\nSSO Team.";
 			messageBodyPart.setText(content);
 	        Multipart multipart = new MimeMultipart();
 	        multipart.addBodyPart(messageBodyPart);
 	        messageBodyPart = new MimeBodyPart();
-	        DataSource source = new FileDataSource(new File(MailFactory.getRootFolder()+MailFactory.LOG_FILE));
+	        DataSource source = new FileDataSource(new File(logfilePath));
 	        messageBodyPart.setDataHandler(new DataHandler(source));
-	        messageBodyPart.setFileName("log.txt");
+	        messageBodyPart.setFileName("server.log");
 	        multipart.addBodyPart(messageBodyPart);
 	        
 	        msg.setContent(multipart);
@@ -205,27 +140,5 @@ public class Mail {
 		}
 	}
 
-	public void readConfig() {
-		try {
-			Properties p = new Properties();
-			p.load(new FileInputStream(new File(MailFactory.getRootFolder()+MailFactory.CONFIG_FILE)));
-			host = p.getProperty("SMTP_HOST");
-			port = p.getProperty("SMTP_PORT");
-			password = p.getProperty("SMTP_PASSWORD");
-			emailFrom = p.getProperty("FROM");
-			emailTo = p.getProperty("TO");
-			subject = p.getProperty("SUBJECT");
-			username = p.getProperty("SMTP_USER");
-
-			System.out.println("SMTP_HOST = " + host);
-			System.out.println("SMTP_PORT = " + port);
-			// System.out.println("SMTP_PASSWORD = " + password);
-			System.out.println("FROM = " + emailFrom);
-			System.out.println("TO = " + emailTo);
-			System.out.println("SUBJECT = " + subject);
-		} catch (Exception e) {
-			System.out.println("readConfig: "+ e);
-		}
-	}
 
 }

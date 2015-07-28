@@ -7,6 +7,26 @@
    		SELECT * FROM qrtz_cron_triggers
 	</sql-query>
 	
+	<sql-query name="getUserTypeId" read-only="true">
+   		<![CDATA[select cast(id AS text) from custom_user_type
+   		where user_type = :user_type limit 1]]>
+	</sql-query>
+	
+	<sql-query name="getUserSubTypeId" read-only="true">
+   		<![CDATA[select cast(id AS text) from custom_user_subtype
+   		where user_sub_type = :user_sub_type limit 1]]>
+	</sql-query>
+	
+	<sql-query name="getListUserTypesUserNames" read-only="true">
+   		select cast(id_nric AS text), cast(user_type AS text), cast(user__sub_type AS text) from custom_stg_user
+	</sql-query>
+	
+	<sql-query name="updateUserTypeSubTypeForUserEntity" read-only="true">
+   		<![CDATA[update user_entity set custom_user_type_id = :custom_user_type_id
+   		, custom_user_subtype_id = :custom_user_subtype_id
+   		where username = :user_name;]]>
+	</sql-query>
+	
 	<sql-query name="insertSTGUserRole" read-only="true">
    		INSERT INTO custom_stg_user_role(
             id, id_nric, role_name, created_date)
@@ -42,7 +62,7 @@
    			SELECT uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)),
    			ID, 'N', 'admin', cast(created_date AS timestamp)
 			FROM
-			USER_ENTITY
+			USER_ENTITY WHERE ID NOT IN (SELECT USER_ENTITY_ID FROM CUSTOM_USER)
    		);
 	</sql-query>
 	
@@ -65,11 +85,11 @@
 	</sql-query>
 	
 	<sql-query name="getUserType" read-only="true">
-   		SELECT cast(user_type AS text), cast(id AS text), cast(custom_user_type_id AS text) from custom_user_type;
+   		SELECT cast(user_type AS text), cast(id AS text), cast(id AS text) from custom_user_type;
 	</sql-query>
 	
 	<sql-query name="getUserSubType" read-only="true">
-   		SELECT cast(user_sub_type AS text), cast(id AS text), cast(custom_user_type_id AS text) from custom_user_type;
+   		SELECT cast(user_sub_type AS text), cast(id AS text), cast(custom_user_type_id AS text) from custom_user_subtype;
 	</sql-query>
 	
 	<sql-query name="count_new_rows" read-only="true">
@@ -79,10 +99,10 @@
 	
 	<sql-query name="migrate_user_entity" read-only="true">
 		WITH user_tmp AS (
-			INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, CREATED_DATE)
+			INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, CREATED_DATE)
 			(SELECT uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
 			 (SELECT ID FROM REALM WHERE lower(NAME) = 'pse') AS REALM_ID,
-			 ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, cast(now() AS timestamp)
+			 ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, cast(now() AS timestamp)
 			 FROM custom_stg_user 
 			 WHERE cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1)
 			 AND ID_NRIC NOT IN (SELECT USERNAME FROM USER_ENTITY)
@@ -122,7 +142,7 @@
     
     <sql-query name="insertToCustomUserType" read-only="true">
 			INSERT INTO custom_user_type(id, user_type, created_date, updated_date) 
-			values(:uuid, :user_type, cast(now() AS timestamp), cast(now() AS timestamp))
+			values(:uuid, upper(:user_type), cast(now() AS timestamp), cast(now() AS timestamp))
     </sql-query>
     
     <sql-query name="insertToCustomUserSubType" read-only="true">
@@ -130,12 +150,6 @@
             id, custom_user_type_id, user_sub_type, created_date, updated_date)
     		values (:id, :custom_user_type_id, :user_sub_type, cast(now() AS timestamp), cast(now() AS timestamp));
     </sql-query>
-    
-    <sql-query name="getUserTypeId" read-only="true">
-			select cast(id AS text) from custom_user_type
-			where user_type = :user_type
-    </sql-query>
-    
     
     <sql-query name="getNewRolesFromStg" read-only="true">
 			SELECT cast(role_name AS text) as rolename FROM custom_stg_user_role WHERE role_name NOT IN (SELECT DISTINCT name FROM keycloak_role);

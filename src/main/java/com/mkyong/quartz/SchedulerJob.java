@@ -1,10 +1,13 @@
 package com.mkyong.quartz;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 
 import org.quartz.JobExecutionContext;
@@ -13,6 +16,8 @@ import org.springframework.scheduling.quartz.QuartzJobBean;
 
 import com.ibm.db2.jcc.DB2Driver;
 import com.mkyong.service.SynDB;
+import com.prunation.mail.Mail;
+import com.prunation.mail.MailFactory;
 
 public class SchedulerJob extends QuartzJobBean {
 
@@ -20,21 +25,66 @@ public class SchedulerJob extends QuartzJobBean {
 	Connection connection = null;
 	PreparedStatement statement = null;
 	ResultSet rs = null;
+	Mail mailBox;
+	
+	String host = "";
+	String port = "";
+	String password = "";
+	String emailFrom = "";
+	String emailTo = "";
+	String subject = "";
+	String username = "";
+	String logfilePath = "";
+	
+	String sNewLine = "\n";
+	String sNoOfRecordInputUser = "No of user rows (Input): ";
+	String sNoOfRecordPressedUser = "No of user records (Processed): ";
+	String sNoOfRecordNotPressedUser = "No of user records (Not Processed): ";
+	String sNoOfRecordInputRole = "No of role rows (Input): ";
+	String sNoOfRecordPressedRole = "No of role records (Processed): ";
+	String sNoOfRecordNotPressedRole = "No of role records (Not Processed): ";
+	String sProcessDuration = "ProcessDuration: ";
+	String sRemarkError = "Remark/Error: ";
+	
+	int countUserProcessed = 0;
+	int countUserNotProcessed = 0;
+	int countRoleProcessed = 0;
+	int countRoleNotProcessed = 0;
 
+	public void readConfig() {
+		try {
+			Properties p = new Properties();
+			p.load(new FileInputStream(new File(MailFactory.getRootFolder()+MailFactory.CONFIG_FILE)));
+			
+		} catch (Exception e) {
+			System.out.println("readConfig: "+ e);
+		}
+	}
 	protected void executeInternal(JobExecutionContext context)
 			throws JobExecutionException {
+		
+		synDB = (SynDB) context.getMergedJobDataMap().get("synDB");
+
+		String eable = synDB.getConfigProperties("ENABLE");
+		if (eable.equalsIgnoreCase("N")) {
+			return;
+		}
+		
 		int user_entity_row_inserted = 0;
+		
+		long startTime = System.currentTimeMillis();
 
 		System.out.println("Batch Job running at "
 				+ Calendar.getInstance().getTime());
-
-		synDB = (SynDB) context.getMergedJobDataMap().get("synDB");
-
-		String eable = synDB.getEnableProperties("enable");
-		if (eable.equalsIgnoreCase("N")) {
-			System.out.println("Batch Job is turn off...");
-			return;
-		}
+		
+		host = synDB.getConfigProperties("SMTP_HOST");
+		port = synDB.getConfigProperties("SMTP_PORT");
+		password = synDB.getConfigProperties("SMTP_PASSWORD");
+		emailFrom = synDB.getConfigProperties("FROM");
+		emailTo = synDB.getConfigProperties("TO");
+		subject = synDB.getConfigProperties("SUBJECT");
+		username = synDB.getConfigProperties("SMTP_USER");
+		logfilePath= synDB.getConfigProperties("LOG_FILE");
 
 		/***
 		 * Sync DB2
@@ -76,6 +126,10 @@ public class SchedulerJob extends QuartzJobBean {
 		 */
 
 		int new_rows = synDB.countNewRows();
+		
+		//No of record input
+		sNoOfRecordInputUser += new_rows + sNewLine;
+		
 		System.out.println("Get new rows count: " + new_rows);
 		if (new_rows > 0) {
 			System.out.println("Migrate User Entity");
@@ -125,19 +179,29 @@ public class SchedulerJob extends QuartzJobBean {
 		List<Object[]> lsUserTypeNotMapping = synDB.checkUserTypeNotMapping();
 		System.out.println("Get user type not mapping count: "
 				+ lsUserTypeNotMapping.size());
+		
+		StringBuilder sbUserTypeNotInsert = null;
 		for (Object[] row : lsUserTypeNotMapping) {
 			String user_type = (String) row[0];
 			String user_sub_type = (String) row[1];
 			System.out.println("Get user_type:" + user_type
 					+ " - user_sub_type:" + user_sub_type);
 			String userTypeId = genearateUDID();
-			synDB.insertCustomUserType(user_type, userTypeId);
+			int result = synDB.insertCustomUserType(user_type, userTypeId);
 			String userSubTypeId = genearateUDID();
-			synDB.insertCustomUserSubType(user_sub_type, userSubTypeId,
+			if(result != -1){
+				System.out.println("User type "+ user_type + " is exist!");
+				synDB.insertCustomUserSubType(user_sub_type, userSubTypeId,
 					userTypeId);
-			System.out.println("Custom user sub type id:" + userSubTypeId);
+				System.out.println("Custom user sub type id:" + userSubTypeId);
+			}else{
+				//Send to admin the user type not exist
+				sbUserTypeNotInsert = new StringBuilder();
+				sbUserTypeNotInsert.append(user_type).append("; ");
+			}
+			
 		}
-
+		
 		List<Object[]> lsUserSubTypeNotMapping = synDB
 				.checkUserSubTypeNotMapping();
 		System.out.println("Get user sub type not mapping count: "
@@ -156,12 +220,35 @@ public class SchedulerJob extends QuartzJobBean {
 				System.out.println("Custom user sub type id:" + userSubTypeId);
 			}
 		}
-
+		
+		/***
+		 * UPDATE USER TYPE, SUB TYPE FOR NEW USER
+		 */
+		
+		//select id_nric, user_type, user__sub_type from custom_stg_user
+		//Sync user type
+		
+		List<Object[]> lsUserTypeUserNames = synDB.getListUserTypesUserNames();
+		for (Object[] row : lsUserTypeUserNames) {
+			String username = (String) row[0];
+			String userType = (String) row[1];
+			String userSubType = (String) row[2];
+			String userTypeId = synDB.getUserTypeId(userType);
+			String userSubTypeId = synDB.getUserSubTypeId(userSubType);
+			if(!userTypeId.equals("")){
+				countUserProcessed += 1;
+				synDB.updateUserTypeSubTypeForUserEntity(userTypeId, userSubTypeId, username);
+			}
+		}
+		
+		countUserNotProcessed = new_rows - countUserProcessed;
+		
 		/******
 		 * Listing stg role
 		 */
 
 		List<Object[]> lsNewStgRoles = synDB.getNewRolesFromStg();
+		
 
 		/******
 		 * Get list application
@@ -182,6 +269,7 @@ public class SchedulerJob extends QuartzJobBean {
 				break;
 			}
 
+			sNoOfRecordInputRole += lsNewStgRoles.size() + sNewLine;
 			if (lsNewStgRoles.size() > 0 && !realmId.equals("")) {
 				for (Object row : lsNewStgRoles) {
 					roleName = (String) row;
@@ -192,12 +280,38 @@ public class SchedulerJob extends QuartzJobBean {
 								String id = genearateUDID();
 								synDB.insertKeycloakRole(id, applicationId,
 										true, roleName, realmId, applicationId);
+								countRoleProcessed += 1;
 							}
 						}
 					}
 				}
+				
+				countRoleNotProcessed = lsNewStgRoles.size() - countRoleProcessed;
 			}
 		}
+		
+		long endTime   = System.currentTimeMillis();
+		long totalTime = endTime - startTime;
+		String sUserTypeNotExist = "";
+		if(sbUserTypeNotInsert != null){
+			sUserTypeNotExist = "UserType not exist: "+sbUserTypeNotInsert.toString() + sNewLine;
+		}
+		String content = sNoOfRecordInputUser + sNoOfRecordPressedUser + sNoOfRecordNotPressedUser;
+		content += sNoOfRecordInputRole + sNoOfRecordPressedRole + sNoOfRecordNotPressedRole;
+		content += sUserTypeNotExist;
+		content += "Process duration: "+totalTime + "(millisecond)";
+		try{
+			System.out.println("Sending email...");
+			Mail mailBox = new Mail(emailFrom, emailTo, subject, host, port, username,
+				password, content, logfilePath);
+			mailBox.send();
+			System.out.println("Emain sent");
+		}catch(Exception ex){
+			ex.printStackTrace();
+		}
+		
+		
+		System.out.println("totalTime: "+ totalTime);
 
 	}
 

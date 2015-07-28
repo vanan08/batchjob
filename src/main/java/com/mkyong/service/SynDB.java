@@ -19,6 +19,7 @@ public interface SynDB{
 	public int insertCustomUserSubType(String userSubType, String ID, String userTypeId);
 	
 	public String getUserTypeId(String userType);
+	public String getUserSubTypeId(String userSubType);
 	public List< Object[] > getNewRolesFromStg();
 	public List< Object[] > getPSERealmId();
 	public List< Object[] > getListAppsBelongRealm();
@@ -52,6 +53,8 @@ public interface SynDB{
 			String needtnc, String user_type, String user__sub_type);
 	
 	public int insertSTGUserRole(String id_nric, String role_name);
-	public String getEnableProperties(String key);
+	public String getConfigProperties(String key);
+	public List< Object[] > getListUserTypesUserNames();
+	public int updateUserTypeSubTypeForUserEntity(String custom_user_type_id, String custom_user_subtype_id, String username);
 	
 }

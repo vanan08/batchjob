@@ -281,7 +281,7 @@ public class SynDBImpl implements SynDB, Serializable {
 		for (Object[] row : returnList) {
 			user_sub_type = (String) row[0];
 			System.out.println("get user type: '" + user_sub_type + "'");
-			if (user_sub_type.equals(userSubType)) {
+			if (user_sub_type != null && user_sub_type.equals(userSubType)) {
 				System.out.println("Exist user sub type");
 				isExist = true;
 				break;
@@ -326,7 +326,18 @@ public class SynDBImpl implements SynDB, Serializable {
 	public String getUserTypeId(String userType) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"getUserTypeId");
-		sqlQuery.setParameter("user_type", userType);
+		sqlQuery.setString("user_type", userType);
+		List<Object> returnList = sqlQuery.list();
+		if (returnList.size() > 0) {
+			return (String) sqlQuery.uniqueResult();
+		} else {
+			return "";
+		}
+	}
+	public String getUserSubTypeId(String userSubType){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getUserSubTypeId");
+		sqlQuery.setString("user_sub_type", userSubType);
 		List<Object> returnList = sqlQuery.list();
 		if (returnList.size() > 0) {
 			return (String) sqlQuery.uniqueResult();
@@ -359,7 +370,7 @@ public class SynDBImpl implements SynDB, Serializable {
 		return value;
 	}
 	
-	public String getEnableProperties(String key) {
+	public String getConfigProperties(String key) {
 		String value = "";
 		try {
 			Properties prop = new Properties();
@@ -424,4 +435,22 @@ public class SynDBImpl implements SynDB, Serializable {
 				"insertToCustomUser");
 		return sqlQuery.executeUpdate();
 	}
+	
+	public List< Object[] > getListUserTypesUserNames(){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getListUserTypesUserNames");
+		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
+		return returnList;
+	}
+	
+	public int updateUserTypeSubTypeForUserEntity(String custom_user_type_id, String custom_user_subtype_id, String username){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"updateUserTypeSubTypeForUserEntity");
+		sqlQuery.setString("custom_user_type_id", custom_user_type_id);
+		sqlQuery.setString("custom_user_subtype_id", custom_user_subtype_id);
+		sqlQuery.setString("user_name", username);
+		return sqlQuery.executeUpdate();
+	}
+	
+	
 }
