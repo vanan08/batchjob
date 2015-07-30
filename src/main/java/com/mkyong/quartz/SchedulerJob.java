@@ -78,8 +78,9 @@ public class SchedulerJob extends QuartzJobBean {
 		 * Sync DB2
 		 */
 
+		//Check disable get data from db2
 		String eableIncoming = synDB
-				.getConfigProperties("ENABLE_IMCOMING_DATA");
+				.getConfigProperties("ENABLE_DB2_DATA");
 		if (eableIncoming.equalsIgnoreCase("Y")) {
 			
 			List<Object[]> lsSTGUsers = getCustomStgUsers();
@@ -114,18 +115,23 @@ public class SchedulerJob extends QuartzJobBean {
 				}
 			}
 
-			// List<Object[]> lsSTGUserRoles =
-			// getCustomStgUserRoles(oldCreatedDateSTGUserRole);
-			//
-			// for (Object[] row : lsSTGUserRoles) {
-			// String id_nric = (String) row[0];
-			// String role_name = (String) row[1];
-			// synDB.insertSTGUserRole(id_nric, role_name);
-			// }
+			 List<Object[]> lsSTGUserRoles = getCustomStgUserRoles();
+			 for (Object[] row : lsSTGUserRoles) {
+				 String id_nric = (String) row[0];
+				 String role_name = (String) row[1];
+				 if(synDB.checkExistStgUserRole(id_nric, role_name) == 0){
+					 System.out.println("INSERT TO KEYCLOAK | ID_NRIC:" + row[0]
+								+ ", ROLE_NAME:" + row[1]);
+					 synDB.insertSTGUserRole(id_nric, role_name);
+				 }
+			 }
 		}
 
+		/**
+		 * Check disable sync to keycloak db
+		 */
 		String eableOutgoing = synDB
-				.getConfigProperties("ENABLE_OUTGOING_DATA");
+				.getConfigProperties("ENABLE_KEYCLOAK_DATA");
 		if (eableOutgoing.equalsIgnoreCase("N")) {
 			return;
 		}
@@ -317,16 +323,20 @@ public class SchedulerJob extends QuartzJobBean {
 				+ sNoOfRecordNotPressedRole;
 		content += sUserTypeNotExist;
 		content += "Process duration: " + totalTime + "(millisecond)";
-		try {
-			System.out.println("Sending email...");
-			Mail mailBox = new Mail(emailFrom, emailTo, subject, host, port,
-					username, password, content, logfilePath);
-			mailBox.send();
-			System.out.println("Emain sent");
-		} catch (Exception ex) {
-			ex.printStackTrace();
+		String enableEmail = synDB.getConfigProperties("ENABLE_EMAIL");
+		
+		//Check disable send mail
+		if(enableEmail.equalsIgnoreCase("Y")){
+			try {
+				System.out.println("Sending email...");
+				Mail mailBox = new Mail(emailFrom, emailTo, subject, host, port,
+						username, password, content, logfilePath);
+				mailBox.send();
+				System.out.println("Mail sent");
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
-
 		System.out.println("totalTime: " + totalTime);
 
 	}
@@ -423,6 +433,67 @@ public class SchedulerJob extends QuartzJobBean {
 	}
 
 	private List<Object[]> getCustomStgUserRoles() {
-		return null;
+		List<Object[]> listData = new ArrayList<Object[]>();
+
+		String ServerName = synDB.getConfigProperties("SERVER_NAME");
+		int PortNumber = Integer.parseInt(synDB
+				.getConfigProperties("PORT_NUMBER"));
+		String DatabaseName = synDB.getConfigProperties("DATABASE");
+
+		java.util.Properties properties = new java.util.Properties();
+
+		properties.put("user", synDB.getConfigProperties("USER"));
+		properties.put("password", synDB.getConfigProperties("PASSWORD"));
+		properties.put("sslConnection", "true");
+		System.setProperty("javax.net.ssl.trustStore",
+				synDB.getConfigProperties("CACERTS_PATH"));
+		System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+		System.setProperty("db2.jcc.charsetDecoderEncoder", "3");
+		String url = "jdbc:db2://" + ServerName + ":" + PortNumber + "/"
+				+ DatabaseName;
+
+		java.sql.Connection con = null;
+		try {
+			new DB2Driver();
+		} catch (Exception e) {
+			System.out.println("Error: failed to load Db2 jcc driver.");
+		}
+
+		try {
+			System.out.println("url: " + url);
+			con = java.sql.DriverManager.getConnection(url, properties);
+			try {
+				String sql = synDB.getConfigProperties("SQL_CUSTOM_STG_USER_ROLE");
+				StringBuilder sbSQLSTGUser = new StringBuilder();
+				sbSQLSTGUser.append(sql);
+
+				System.out.println("Select from PSE.SQL_CUSTOM_STG_USER_ROLE DB2: "
+						+ sbSQLSTGUser.toString());
+				java.sql.Statement ps = con.createStatement();
+				java.sql.ResultSet rs = ps
+						.executeQuery(sbSQLSTGUser.toString());
+				System.out.println("get data....");
+
+				Object[] objArrays = new Object[3];
+				while (rs.next()) {
+					objArrays[0] = rs.getString(1);
+					objArrays[1] = rs.getString(2);
+					objArrays[2] = rs.getString(3);
+					listData.add(objArrays);
+					System.out.println("GET FROM DB2 | ID_NRIC:" + objArrays[0]
+							+ ", ROLE_NAME:" + objArrays[1] + ", CREATED_DATE:"
+							+ objArrays[2]);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.out.println("select is failing1");
+			}
+
+			con.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return listData;
 	}
 }

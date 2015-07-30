@@ -61,7 +61,6 @@ public class SynDBImpl implements SynDB, Serializable {
 				"insertSTGUser");
 		sqlQuery.setParameter("id_nric", id_nric);
 		sqlQuery.setParameter("role_name", role_name);
-		
 		System.out.println("Insert new stg user role '" + role_name+ "'");
 		return sqlQuery.executeUpdate();
 	}

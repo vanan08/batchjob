@@ -41,7 +41,7 @@
             id, id_nric, role_name, created_date)
     	VALUES (uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
     		:id_nric, :role_name, 
-    		cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp));
+    		cast(now() as timestamp));
 	</sql-query>
 	
 	<sql-query name="insertSTGUser" read-only="true">
