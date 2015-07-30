@@ -44,7 +44,7 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setParameter("first_name", first_name);
 		sqlQuery.setParameter("last_name", last_name);
 		sqlQuery.setParameter("email", email);
-		sqlQuery.setParameter("email", email);
+		sqlQuery.setParameter("account_status", account_status);
 		sqlQuery.setParameter("mobile", mobile);
 		sqlQuery.setParameter("agent_code", agent_code);
 		sqlQuery.setParameter("agency", agency);
@@ -52,7 +52,6 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setParameter("needtnc", needtnc);
 		sqlQuery.setParameter("user_type", user_type);
 		sqlQuery.setParameter("user__sub_type", user__sub_type);
-		
 		System.out.println("Insert new stg user '" + id_nric );
 		return sqlQuery.executeUpdate();
 	}
@@ -70,10 +69,10 @@ public class SynDBImpl implements SynDB, Serializable {
 	public String getMaxCreatedDateSTGUser() {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"getMaxCreatedDateSTGUser");
-		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
-		for (Object[] row : returnList) {
-			if(row != null && row[0] != null){
-				String createdDate = (String) row[0];
+		List<String> returnList = (List<String>) sqlQuery.list();
+		for (String row : returnList) {
+			if(row != null){
+				String createdDate = row;
 				return createdDate;
 			}
 		}
@@ -85,10 +84,10 @@ public class SynDBImpl implements SynDB, Serializable {
 	public String getMaxCreatedDateStgUserRoles() {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"getMaxCreatedDateSTGUserRole");
-		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
-		for (Object[] row : returnList) {
-			if(row != null && row[0] != null){
-				String createdDate = (String) row[0];
+		List<String> returnList = (List<String>) sqlQuery.list();
+		for (String row : returnList) {
+			if(row != null){
+				String createdDate = row;
 				return createdDate;
 			}
 		}
@@ -386,7 +385,6 @@ public class SynDBImpl implements SynDB, Serializable {
 			}
 			// get the property value and print it out
 			value = prop.getProperty(key);
-			System.out.println(key + ": " + value);
 		} catch (Exception e) {
 			System.out.println("readConfig: " + e);
 		}
@@ -450,6 +448,31 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setString("custom_user_subtype_id", custom_user_subtype_id);
 		sqlQuery.setString("user_name", username);
 		return sqlQuery.executeUpdate();
+	}
+	
+	public int checkExistStgUser(String username){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"checkExistStgUser");
+		sqlQuery.setString("id_nric", username);
+		List<Object> returnList = sqlQuery.list();
+		if (returnList.size() > 0) {
+			return ((Number) sqlQuery.uniqueResult()).intValue();
+		} else {
+			return 0;
+		}
+	}
+	
+	public int checkExistStgUserRole(String username, String roleName){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"checkExistStgUserRole");
+		sqlQuery.setString("id_nric", username);
+		sqlQuery.setString("role_name", roleName);
+		List<Object> returnList = sqlQuery.list();
+		if (returnList.size() > 0) {
+			return ((Number) sqlQuery.uniqueResult()).intValue();
+		} else {
+			return 0;
+		}
 	}
 	
 	

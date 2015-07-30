@@ -23,8 +23,7 @@
 	
 	<sql-query name="updateUserTypeSubTypeForUserEntity" read-only="true">
    		<![CDATA[update user_entity set custom_user_type_id = :custom_user_type_id
-   		, custom_user_subtype_id = :custom_user_subtype_id
-   		where username = :user_name;]]>
+   		, custom_user_subtype_id = :custom_user_subtype_id where username = :user_name]]>
 	</sql-query>
 	
 	<sql-query name="insertSTGUserRole" read-only="true">

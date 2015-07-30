@@ -7,6 +7,16 @@
    		SELECT * FROM qrtz_cron_triggers
 	</sql-query>
 	
+	<sql-query name="checkExistStgUser" read-only="true">
+   		<![CDATA[select count(*) from custom_stg_user
+   		where ID_NRIC = :id_nric]]>
+	</sql-query>
+	
+	<sql-query name="checkExistStgUserRole" read-only="true">
+   		<![CDATA[select count(*) from custom_stg_user_role
+   		where ID_NRIC = :id_nric and role_name=:role_name]]>
+	</sql-query>
+	
 	<sql-query name="getUserTypeId" read-only="true">
    		<![CDATA[select cast(id AS text) from custom_user_type
    		where user_type = :user_type limit 1]]>
@@ -23,8 +33,7 @@
 	
 	<sql-query name="updateUserTypeSubTypeForUserEntity" read-only="true">
    		<![CDATA[update user_entity set custom_user_type_id = :custom_user_type_id
-   		, custom_user_subtype_id = :custom_user_subtype_id
-   		where username = :user_name;]]>
+   		, custom_user_subtype_id = :custom_user_subtype_id where username = :user_name]]>
 	</sql-query>
 	
 	<sql-query name="insertSTGUserRole" read-only="true">

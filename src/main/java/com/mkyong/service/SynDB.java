@@ -10,6 +10,9 @@ public interface SynDB{
 	
 	public int migrateUserEntity();
 	
+	public int checkExistStgUser(String username);
+	public int checkExistStgUserRole(String username, String roleName);
+	
 	public int checkCustomUserRole();
 	public int migrateCustomUserRole();
 	
