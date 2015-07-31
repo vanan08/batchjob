@@ -9,22 +9,22 @@
 	
 	<sql-query name="checkExistStgUser" read-only="true">
    		<![CDATA[select count(*) from custom_stg_user
-   		where ID_NRIC = :id_nric]]>
+   		where trim(ID_NRIC) = trim(:id_nric)]]>
 	</sql-query>
 	
 	<sql-query name="checkExistStgUserRole" read-only="true">
    		<![CDATA[select count(*) from custom_stg_user_role
-   		where ID_NRIC = :id_nric and role_name=:role_name]]>
+   		where trim(ID_NRIC) = trim(:id_nric) and trim(role_name)=trim(:role_name)]]>
 	</sql-query>
 	
 	<sql-query name="getUserTypeId" read-only="true">
    		<![CDATA[select cast(id AS text) from custom_user_type
-   		where user_type = :user_type limit 1]]>
+   		where trim(user_type) = trim(:user_type) limit 1]]>
 	</sql-query>
 	
 	<sql-query name="getUserSubTypeId" read-only="true">
    		<![CDATA[select cast(id AS text) from custom_user_subtype
-   		where user_sub_type = :user_sub_type limit 1]]>
+   		where trim(user_sub_type) = trim(:user_sub_type) limit 1]]>
 	</sql-query>
 	
 	<sql-query name="getListUserTypesUserNames" read-only="true">
@@ -33,7 +33,7 @@
 	
 	<sql-query name="updateUserTypeSubTypeForUserEntity" read-only="true">
    		<![CDATA[update user_entity set custom_user_type_id = :custom_user_type_id
-   		, custom_user_subtype_id = :custom_user_subtype_id where username = :user_name]]>
+   		, custom_user_subtype_id = :custom_user_subtype_id where trim(username) = trim(:user_name)]]>
 	</sql-query>
 	
 	<sql-query name="insertSTGUserRole" read-only="true">
@@ -84,13 +84,12 @@
 	<sql-query name="getNewUsers" read-only="true">
    		SELECT cast(id_nric AS text), cast(user_type AS text)
 		FROM custom_stg_user 
-		WHERE cast(created_date AS timestamp) > 
-		(SELECT cast(created_date AS timestamp) FROM USER_ENTITY WHERE created_date IS NOT NULL
-		ORDER BY created_date DESC LIMIT 1);
+		WHERE id_nric NOT IN 
+		(SELECT username FROM USER_ENTITY);
 	</sql-query>
 	
 	<sql-query name="getNewUserId" read-only="true">
-   		SELECT cast(ID AS text), cast(USERNAME AS text) from USER_ENTITY;
+   		 <![CDATA[SELECT cast(ID AS text), cast(USERNAME AS text) from USER_ENTITY WHERE trim(username)=trim(:username)]]>
 	</sql-query>
 	
 	<sql-query name="getUserType" read-only="true">
@@ -113,8 +112,7 @@
 			 (SELECT ID FROM REALM WHERE lower(NAME) = 'pse') AS REALM_ID,
 			 ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, cast(now() AS timestamp)
 			 FROM custom_stg_user 
-			 WHERE cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1)
-			 AND ID_NRIC NOT IN (SELECT USERNAME FROM USER_ENTITY)
+			 WHERE ID_NRIC NOT IN (SELECT USERNAME FROM USER_ENTITY)
 			)
 		    RETURNING 1
 		)
@@ -136,17 +134,17 @@
     </sql-query>
     
     <sql-query name="user_type_not_mapping" read-only="true">
-		SELECT cast(user_type AS text), cast(user__sub_type AS text) as user_sub_type FROM custom_stg_user 
+		SELECT distinct cast(user_type AS text), cast(user__sub_type AS text) as user_sub_type FROM custom_stg_user 
 		WHERE user_type NOT IN (SELECT A.user_type
 		FROM custom_user_type A, custom_user_subtype B WHERE A.id = B.custom_user_type_id )
     </sql-query>
     
     <sql-query name="user_sub_type_not_mapping" read-only="true">
-		SELECT cast(user__sub_type AS text), cast(user_type AS text) FROM custom_stg_user 
+		SELECT distinct cast(user__sub_type AS text), cast(user_type AS text) FROM custom_stg_user 
 		WHERE user__sub_type NOT IN 
 		(SELECT B.user_sub_type 
 		FROM custom_user_type A, custom_user_subtype B 
-		WHERE A.id = B.custom_user_type_id  )
+		WHERE trim(A.id) = trim(B.custom_user_type_id)  )
     </sql-query>
     
     <sql-query name="insertToCustomUserType" read-only="true">
@@ -193,4 +191,39 @@
      <sql-query name="getRoleId" read-only="true">
 			SELECT cast(id AS text) role_id, cast(name AS text) role_name FROM keycloak_role;
     </sql-query>
+    <sql-query name="insertToUserEntity" read-only="true">
+	    INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, CREATED_DATE)
+		VALUES(
+			uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
+			(SELECT ID FROM REALM WHERE lower(NAME) = 'pse'),
+			trim(:ID_NRIC), trim(:FIRST_NAME), trim(:LAST_NAME), trim(:MOBILE), trim(:EMAIL), trim(:ACCOUNT_STATUS),
+			trim(:AGENT_CODE), trim(:AGENCY), trim(:NEED2FA), trim(:NEEDTNC), 
+			cast(now() AS timestamp)
+		)
+	</sql-query>
+	
+	<sql-query name="checkExistUserEntity" read-only="true">
+	    <![CDATA[SELECT * FROM USER_ENTITY WHERE username=:username]]>
+	</sql-query>
+	
+	<sql-query name="clearUserTypeSubType" read-only="true">
+	    <![CDATA[UPDATE USER_ENTITY SET CUSTOM_USER_SUBTYPE_ID=NULL, CUSTOM_USER_TYPE_ID=NULL]]>
+	</sql-query>
+	
+	<sql-query name="deleteSubType" read-only="true">
+	    <![CDATA[DELETE CUSTOM_USER_SUBTYPE]]>
+	</sql-query>
+	
+	<sql-query name="deleteUserType" read-only="true">
+	    <![CDATA[DELETE CUSTOM_USER_TYPE]]>
+	</sql-query>
+	
+	<sql-query name="checkUserType" read-only="true">
+	    <![CDATA[SELECT * FROM CUSTOM_USER_TYPE WHERE trim(user_type)=trim(:user_type)]]>
+	</sql-query>
+	
+	<sql-query name="checkUserSubType" read-only="true">
+	    <![CDATA[SELECT * FROM CUSTOM_USER_SUBTYPE WHERE trim(user_sub_type)=trim(:user_sub_type)]]>
+	</sql-query>
+	
 </hibernate-mapping>

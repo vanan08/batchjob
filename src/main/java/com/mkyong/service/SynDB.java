@@ -55,9 +55,13 @@ public interface SynDB{
 			String mobile, String agent_code, String agency, String need2fa,
 			String needtnc, String user_type, String user__sub_type);
 	
+	public int clearUserTypeSubType();
+	public int deleteSubType();
+	public int deleteUserType();
 	public int insertSTGUserRole(String id_nric, String role_name);
 	public String getConfigProperties(String key);
 	public List< Object[] > getListUserTypesUserNames();
 	public int updateUserTypeSubTypeForUserEntity(String custom_user_type_id, String custom_user_subtype_id, String username);
-	
+	public int checkExistUserEntity(String username);
+	public int insertToUserEntity(String ID_NRIC, String FIRST_NAME, String LAST_NAME, String MOBILE, String EMAIL, String ACCOUNT_STATUS, String AGENT_CODE, String AGENCY, String NEED2FA, String NEEDTNC);
 }
