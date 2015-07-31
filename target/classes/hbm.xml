@@ -196,7 +196,8 @@
 		VALUES(
 			uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
 			(SELECT ID FROM REALM WHERE lower(NAME) = 'pse'),
-			:ID_NRIC, :FIRST_NAME, :LAST_NAME, :MOBILE, :EMAIL, :ACCOUNT_STATUS, :AGENT_CODE, :AGENCY, :NEED2FA, :NEEDTNC, 
+			trim(:ID_NRIC), trim(:FIRST_NAME), trim(:LAST_NAME), trim(:MOBILE), trim(:EMAIL), trim(:ACCOUNT_STATUS),
+			trim(:AGENT_CODE), trim(:AGENCY), trim(:NEED2FA), trim(:NEEDTNC), 
 			cast(now() AS timestamp)
 		)
 	</sql-query>
