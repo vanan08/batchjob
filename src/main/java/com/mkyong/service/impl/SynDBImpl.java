@@ -40,18 +40,18 @@ public class SynDBImpl implements SynDB, Serializable {
 			String needtnc, String user_type, String user__sub_type) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"insertSTGUser");
-		sqlQuery.setParameter("id_nric", id_nric);
-		sqlQuery.setParameter("first_name", first_name);
-		sqlQuery.setParameter("last_name", last_name);
-		sqlQuery.setParameter("email", email);
-		sqlQuery.setParameter("account_status", account_status);
-		sqlQuery.setParameter("mobile", mobile);
-		sqlQuery.setParameter("agent_code", agent_code);
-		sqlQuery.setParameter("agency", agency);
-		sqlQuery.setParameter("need2fa", need2fa);
-		sqlQuery.setParameter("needtnc", needtnc);
-		sqlQuery.setParameter("user_type", user_type);
-		sqlQuery.setParameter("user__sub_type", user__sub_type);
+		sqlQuery.setString("id_nric", id_nric);
+		sqlQuery.setString("first_name", first_name);
+		sqlQuery.setString("last_name", last_name);
+		sqlQuery.setString("email", email);
+		sqlQuery.setString("account_status", account_status);
+		sqlQuery.setString("mobile", mobile);
+		sqlQuery.setString("agent_code", agent_code);
+		sqlQuery.setString("agency", agency);
+		sqlQuery.setString("need2fa", need2fa);
+		sqlQuery.setString("needtnc", needtnc);
+		sqlQuery.setString("user_type", user_type);
+		sqlQuery.setString("user__sub_type", user__sub_type);
 		System.out.println("Insert new stg user '" + id_nric );
 		return sqlQuery.executeUpdate();
 	}
@@ -59,8 +59,8 @@ public class SynDBImpl implements SynDB, Serializable {
 	public int insertSTGUserRole(String id_nric, String role_name) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"insertSTGUser");
-		sqlQuery.setParameter("id_nric", id_nric);
-		sqlQuery.setParameter("role_name", role_name);
+		sqlQuery.setString("id_nric", id_nric);
+		sqlQuery.setString("role_name", role_name);
 		System.out.println("Insert new stg user role '" + role_name+ "'");
 		return sqlQuery.executeUpdate();
 	}

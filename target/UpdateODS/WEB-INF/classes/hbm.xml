@@ -37,21 +37,21 @@
 	</sql-query>
 	
 	<sql-query name="insertSTGUserRole" read-only="true">
-   		INSERT INTO custom_stg_user_role(
+   		<![CDATA[INSERT INTO custom_stg_user_role(
             id, id_nric, role_name, created_date)
     	VALUES (uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
     		:id_nric, :role_name, 
-    		cast(now() as timestamp));
+    		cast(now() as timestamp));]]>
 	</sql-query>
 	
 	<sql-query name="insertSTGUser" read-only="true">
-   		INSERT INTO custom_stg_user(
+   		<![CDATA[INSERT INTO custom_stg_user(
             id_nric, first_name, last_name, email, account_status, mobile, 
             agent_code, agency, need2fa, needtnc, user_type, user__sub_type, 
             created_date)
     	VALUES (:id_nric, :first_name, :last_name, :email, :account_status, :mobile, 
             :agent_code, :agency, :need2fa, :needtnc, :user_type, :user__sub_type, 
-            cast(now() as timestamp));
+            cast(now() as timestamp));]]>
 	</sql-query>
 	
 	<sql-query name="getMaxCreatedDateSTGUser" read-only="true">
