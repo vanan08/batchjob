@@ -41,7 +41,7 @@
             id, id_nric, role_name, created_date)
     	VALUES (uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
     		:id_nric, :role_name, 
-    		cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp));
+    		cast(now() as timestamp));
 	</sql-query>
 	
 	<sql-query name="insertSTGUser" read-only="true">
@@ -51,15 +51,15 @@
             created_date)
     	VALUES (:id_nric, :first_name, :last_name, :email, :account_status, :mobile, 
             :agent_code, :agency, :need2fa, :needtnc, :user_type, :user__sub_type, 
-            cast(to_timestamp(:created_date, 'YYYY-MM-DD HH:MI:SS.MS') as timestamp));
+            cast(now() as timestamp));
 	</sql-query>
 	
 	<sql-query name="getMaxCreatedDateSTGUser" read-only="true">
-   		SELECT cast(max(created_date) as timestamp) FROM CUSTOM_STG_USER
+   		SELECT cast(max(created_date) as text) FROM CUSTOM_STG_USER
 	</sql-query>
 	
 	<sql-query name="getMaxCreatedDateSTGUserRole" read-only="true">
-   		SELECT cast(max(created_date) as timestamp) FROM CUSTOM_STG_USER_ROLE
+   		SELECT cast(max(created_date) as text) FROM CUSTOM_STG_USER_ROLE
 	</sql-query>
 	
 	<sql-query name="getUserRealm" read-only="true">
@@ -83,8 +83,8 @@
 	
 	<sql-query name="getNewUsers" read-only="true">
    		SELECT cast(id_nric AS text), cast(user_type AS text)
-	FROM custom_stg_user 
-	WHERE cast(created_date AS timestamp) > 
+		FROM custom_stg_user 
+		WHERE cast(created_date AS timestamp) > 
 		(SELECT cast(created_date AS timestamp) FROM USER_ENTITY WHERE created_date IS NOT NULL
 		ORDER BY created_date DESC LIMIT 1);
 	</sql-query>
@@ -103,7 +103,7 @@
 	
 	<sql-query name="count_new_rows" read-only="true">
    		SELECT count(*) as count_row_input
-	FROM custom_stg_user where cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1);;
+		FROM custom_stg_user where cast(created_date AS timestamp) > (SELECT cast(created_date AS timestamp) FROM USER_ENTITY where created_date is not null ORDER BY created_date DESC LIMIT 1);;
 	</sql-query>
 	
 	<sql-query name="migrate_user_entity" read-only="true">
