@@ -60,8 +60,6 @@ public class SchedulerJob extends QuartzJobBean {
 			return;
 		}
 
-		int user_entity_row_inserted = 0;
-
 		long startTime = System.currentTimeMillis();
 
 		System.out.println("Batch Job running at "
@@ -87,9 +85,9 @@ public class SchedulerJob extends QuartzJobBean {
 			synDB.deleteUserType();
 		}
 
-		/***
-		 * Sync DB2
-		 */
+		/********************************
+		 * 		SYNC USERS FROM DB2		*
+		 *******************************/
 
 		// Check disable get data from db2
 		String eableIncoming = synDB.getConfigProperties("ENABLE_DB2_DATA");
@@ -122,17 +120,14 @@ public class SchedulerJob extends QuartzJobBean {
 					String user__sub_type = (String) row[11];
 					System.out.println("Check user exist in user entity table");
 					if (synDB.checkExistUserEntity(id_nric) == 0) {
-//					try{
 						System.out.println("======================");
 						System.out
 								.println("Insert into UserEntity: " + id_nric);
+						
+						//Insert to User Entity table
 						synDB.insertToUserEntity(id_nric, first_name,
 								last_name, mobile, email, account_status,
 								agent_code, agency, need2fa, needtnc);
-						user_entity_row_inserted += 1;
-//					}catch(Exception ex){
-//						
-//					}
 					}
 
 					if (synDB.checkExistStgUser(id_nric) == 0) {
@@ -159,6 +154,9 @@ public class SchedulerJob extends QuartzJobBean {
 				}
 			}
 		}
+		
+		
+		
 
 		/**
 		 * Check disable sync to keycloak db
@@ -169,68 +167,82 @@ public class SchedulerJob extends QuartzJobBean {
 		if (eableOutgoing.equalsIgnoreCase("N")) {
 			return;
 		}
+		
+		
+		/********************************
+		 * 			SYNC ROLES			*
+		 *******************************/
+		
+		List<Object[]> lsNewStgRoles = synDB.getNewRolesFromStg();
+		List<String> newRoleIds = new ArrayList<String>();
+		
+		//Get PSE Realm ID
+		List<Object[]> lsRealmIDs = synDB.getPSERealmId();
+		if (lsRealmIDs.size() > 0) {
+			String realmId = "";
+			String roleName = "";
+			for (Object[] row : lsRealmIDs) {
+				realmId = (String) row[0];
+				break;
+			}
 
-		/***
-		 * TODO: Get all new user
-		 */
-		List<Object[]> lsNewUsers = synDB.getNewUsers();
-		/***************
-		 * update user_entity
-		 */
-
-		// int new_rows = synDB.countNewRows();
-
-		// No of record input
-		// sNoOfRecordInputUser += new_rows + sNewLine;
-
-		// System.out.println("Get new rows count: " + new_rows);
-		// if (new_rows > 0) {
-		// System.out.println("Migrate User Entity");
-		// user_entity_row_inserted = synDB.migrateUserEntity();
-		// System.out.println("Migrate User Entity >> Num Rows inserted: "
-		// + user_entity_row_inserted);
-		// }
-
-		/*****
-		 * Get all user id just inserted belog new list user name get above
-		 */
-		if(lsSTGUsers != null){
-			for (Object[] row : lsSTGUsers) {
-				String username = (String) row[0];
-				String userType = (String) row[10];
-				String userId = synDB.getNewUserId(username);
-				System.out.println("Custom user id:" + userId);
-				System.out.println("Custom user userType:" + userType);
-				/*******
-				 * Get roles id from role list names get from config file
-				 */
-	
-				List<String> rolesList = synDB.getUserTypeRoles(userType);
-	
-				for (String _role_id : rolesList) {
-					System.out.println("Get configration role id:" + _role_id);
-					/*********
-					 * Insert to user_role_mapping
-					 */
-					if (!_role_id.equals("")) {
-						synDB.insertUserRoleMapping(_role_id, userId);
-					} else {
-						System.out.println("Can't find role id '" + _role_id
-								+ "' from keycloak_role table.");
+			sNoOfRecordInputRole += lsNewStgRoles.size() + sNewLine;
+			if (lsNewStgRoles.size() > 0 && !realmId.equals("")) {
+				for (Object row : lsNewStgRoles) {
+					roleName = (String) row;
+					if (roleName != null && !roleName.equals("")) {
+						String id = genearateUDID();
+						newRoleIds.add(id);
+						if(roleName.trim().contains(",")){
+							String[] roleNames = roleName.trim().split(",");
+							for (String role : roleNames) {
+								synDB.insertKeycloakRole(id, realmId,
+										false, role, realmId, null, realmId, false);
+								countRoleProcessed += 1;
+							}
+						}else{
+							synDB.insertKeycloakRole(id, realmId,
+									false, roleName, realmId, null, realmId, false);
+							countRoleProcessed += 1;
+						}
 					}
 				}
+
+				countRoleNotProcessed = lsNewStgRoles.size()
+						- countRoleProcessed;
 			}
 		}
+		
 
+
+		
+		/********************************
+		 * 		ASSIGN ROLES FOR USERS	*
+		 *******************************/
+
+		List<Object[]> lsSTGUserRoles = getCustomStgUserRoles();
+		for (Object[] row : lsSTGUserRoles) {
+			String id_nric = (String) row[0];
+			String role_name = (String) row[1];
+			String userId = synDB.getNewUserId(id_nric.trim());
+			String role_id = synDB.getRoleIdByName(role_name.trim());
+			System.out.println("Assign role ["+role_id+"] for [" + username+"]");
+			if(!userId.trim().equals("") && !role_id.trim().equals(""))
+				synDB.insertUserRoleMapping(role_id, userId);
+		}
+		
+		
 		/***
 		 * Update custom_user
 		 */
 
 		synDB.insertToCustomUser();
 
-		/*******
-		 * Check user type not exist
-		 */
+		
+		/********************************************
+		 * 		SYNC USER TYPE AND USER SUBTYPE		*
+		 *******************************************/
+		
 		List<Object[]> lsUserTypeNotMapping = synDB.checkUserTypeNotMapping();
 		System.out.println("Get user type not mapping count: "
 				+ lsUserTypeNotMapping.size());
@@ -277,12 +289,10 @@ public class SchedulerJob extends QuartzJobBean {
 			}
 		}
 
-		/***
-		 * UPDATE USER TYPE, SUB TYPE FOR NEW USER
-		 */
 
-		// select id_nric, user_type, user__sub_type from custom_stg_user
-		// Sync user type
+		/********************************************
+		 * UPDATE USER TYPE, SUB TYPE FOR NEW USER	*
+		 *******************************************/
 
 		List<Object[]> lsUserTypeUserNames = synDB.getListUserTypesUserNames();
 		for (Object[] row : lsUserTypeUserNames) {
@@ -299,53 +309,7 @@ public class SchedulerJob extends QuartzJobBean {
 		}
 
 		countUserNotProcessed = noOfRecordInputUser - countUserProcessed;
-
-		/******
-		 * Listing stg role
-		 */
-
-		List<Object[]> lsNewStgRoles = synDB.getNewRolesFromStg();
-
-		/******
-		 * Get list application
-		 */
-		List<Object[]> lsAppsOfRealm = synDB.getListAppsBelongRealm();
-
-		/******
-		 * Get PSE Realm ID
-		 */
-		List<Object[]> lsRealmIDs = synDB.getPSERealmId();
-		if (lsRealmIDs.size() > 0) {
-			String realmId = "";
-			String roleName = "";
-			String applicationId = "";
-
-			for (Object[] row : lsRealmIDs) {
-				realmId = (String) row[0];
-				break;
-			}
-
-			sNoOfRecordInputRole += lsNewStgRoles.size() + sNewLine;
-			if (lsNewStgRoles.size() > 0 && !realmId.equals("")) {
-				for (Object row : lsNewStgRoles) {
-					roleName = (String) row;
-					if (!roleName.equals("")) {
-						for (Object appRow : lsAppsOfRealm) {
-							applicationId = (String) appRow;
-							if (!applicationId.equals("")) {
-								String id = genearateUDID();
-								synDB.insertKeycloakRole(id, applicationId,
-										true, roleName, realmId, applicationId);
-								countRoleProcessed += 1;
-							}
-						}
-					}
-				}
-
-				countRoleNotProcessed = lsNewStgRoles.size()
-						- countRoleProcessed;
-			}
-		}
+		
 
 		long endTime = System.currentTimeMillis();
 		long totalTime = endTime - startTime;

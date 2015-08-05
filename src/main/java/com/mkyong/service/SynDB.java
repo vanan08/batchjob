@@ -16,6 +16,7 @@ public interface SynDB{
 	public int checkCustomUserRole();
 	public int migrateCustomUserRole();
 	
+	public String getRoleIdByName(String role_name);
 	public List< Object[] > checkUserTypeNotMapping();
 	public List< Object[] > checkUserSubTypeNotMapping();
 	public int insertCustomUserType(String userType, String ID);
@@ -28,7 +29,7 @@ public interface SynDB{
 	public List< Object[] > getListAppsBelongRealm();
 	
 	public int insertKeycloakRole(String id, String app_realm_constraint, boolean application_role, String name, 
-    		String realm_id, String application);
+    		String realm_id, String application, String realm, boolean state);
 	
 	public List< Object[] > getNewUsers();
 	public String getNewUserId(String username);

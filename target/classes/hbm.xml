@@ -7,6 +7,11 @@
    		SELECT * FROM qrtz_cron_triggers
 	</sql-query>
 	
+	<sql-query name="getRoleIdByName" read-only="true">
+			<![CDATA[SELECT cast(id AS text) role_id, cast(name AS text) role_name FROM keycloak_role
+			where trim(name) = trim(:role_name)]]>
+    </sql-query>
+    
 	<sql-query name="checkExistStgUser" read-only="true">
    		<![CDATA[select count(*) from custom_stg_user
    		where trim(ID_NRIC) = trim(:id_nric)]]>
@@ -173,9 +178,9 @@
     <sql-query name="insertKeycloakRole" read-only="true">
     			INSERT INTO keycloak_role(
             		id, app_realm_constraint, application_role, name, 
-            		realm_id, application, created_date)
+            		realm_id, application, realm, role_state)
     			VALUES (:id, :app_realm_constraint, :application_role, :name, 
-            		:realm_id, :application, cast(now() AS timestamp));						
+            		:realm_id, :application, :realm, :role_state);						
      </sql-query>
      
       <sql-query name="insertUserRoleMapping" read-only="true">

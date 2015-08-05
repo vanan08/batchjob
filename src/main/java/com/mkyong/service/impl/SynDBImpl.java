@@ -407,6 +407,19 @@ public class SynDBImpl implements SynDB, Serializable {
 		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
 		return returnList;
 	}
+	
+	public String getRoleIdByName(String role_name){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getRoleIdByName");
+		sqlQuery.setString("role_name", role_name);
+		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
+		String role_id = "";
+		for (Object[] row : returnList) {
+			role_id = (String) row[0];
+			break;
+		}
+		return role_id;
+	}
 
 	public List<Object[]> getPSERealmId() {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
@@ -424,7 +437,7 @@ public class SynDBImpl implements SynDB, Serializable {
 
 	public int insertKeycloakRole(String id, String app_realm_constraint,
 			boolean application_role, String name, String realm_id,
-			String application) {
+			String application, String realm, boolean state) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"insertKeycloakRole");
 		sqlQuery.setParameter("id", id);
@@ -433,6 +446,8 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setParameter("name", name);
 		sqlQuery.setParameter("realm_id", realm_id);
 		sqlQuery.setParameter("application", application);
+		sqlQuery.setParameter("realm", realm);
+		sqlQuery.setParameter("role_state", state);
 		return sqlQuery.executeUpdate();
 	}
 
