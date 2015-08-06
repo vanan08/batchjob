@@ -15,7 +15,7 @@ import org.springframework.scheduling.quartz.QuartzJobBean;
 import com.ibm.db2.jcc.DB2Driver;
 import com.mkyong.service.SynDB;
 import com.prunation.mail.Mail;
-
+//
 public class SchedulerJob extends QuartzJobBean {
 
 	private SynDB synDB;
