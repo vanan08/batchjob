@@ -1,6 +1,7 @@
 package com.mkyong.quartz;
 
 import java.sql.Connection;
+import java.util.StringTokenizer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -169,9 +170,9 @@ public class SchedulerJob extends QuartzJobBean {
 		}
 		
 		
-		/********************************
-		 * 			SYNC ROLES			*
-		 *******************************/
+		/*******************************************************************
+		 * 			SYNC USER ROLES into KEYCLOAK_ROLE (ROLE MASTER TABLE) *
+		 *******************************************************************/
 		
 		List<Object[]> lsNewStgRoles = synDB.getNewRolesFromStg();
 		List<String> newRoleIds = new ArrayList<String>();
@@ -216,9 +217,9 @@ public class SchedulerJob extends QuartzJobBean {
 
 
 		
-		/********************************
-		 * 		ASSIGN ROLES FOR USERS	*
-		 *******************************/
+		/******************************************************************
+		 * 		SYNC USER ROLES INTO USER_ROLE_MAPPING (ASSIGN USER ROLE) *
+		 ******************************************************************/
 
 		List<Object[]> lsSTGUserRoles = getCustomStgUserRoles();
 		for (Object[] row : lsSTGUserRoles) {
@@ -502,5 +503,9 @@ public class SchedulerJob extends QuartzJobBean {
 		}
 
 		return listData;
+	}
+	
+	public static void main(String args[]) {
+	
 	}
 }
