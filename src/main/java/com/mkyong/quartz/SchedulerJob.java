@@ -1,22 +1,19 @@
 package com.mkyong.quartz;
 
 import java.sql.Connection;
-import java.util.StringTokenizer;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
-
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.scheduling.quartz.QuartzJobBean;
-
 import com.ibm.db2.jcc.DB2Driver;
 import com.mkyong.service.SynDB;
 import com.prunation.mail.Mail;
-//
+import java.util.*;
 public class SchedulerJob extends QuartzJobBean {
 
 	private SynDB synDB;
@@ -50,6 +47,7 @@ public class SchedulerJob extends QuartzJobBean {
 	int countRoleNotProcessed = 0;
 	int noOfRecordInputUser = 0;
 
+
 	protected void executeInternal(JobExecutionContext context)
 			throws JobExecutionException {
 
@@ -75,6 +73,17 @@ public class SchedulerJob extends QuartzJobBean {
 		username = synDB.getConfigProperties("SMTP_USER");
 		logfilePath = synDB.getConfigProperties("LOG_FILE");
 
+		
+		/**
+		 * Check disable sync to keycloak db
+		 */
+		String eableOutgoing = synDB
+				.getConfigProperties("ENABLE_KEYCLOAK_DATA");
+		System.out.println("eableOutgoing: " + eableOutgoing);
+		if (eableOutgoing.equalsIgnoreCase("N")) {
+			return;
+		}
+		
 		/**
 		 * Clear user type, subtype
 		 */
@@ -87,14 +96,14 @@ public class SchedulerJob extends QuartzJobBean {
 		}
 
 		/********************************
-		 * 		SYNC USERS FROM DB2		*
+		 * 		SYNC USERS          	*
 		 *******************************/
 
 		// Check disable get data from db2
 		String eableIncoming = synDB.getConfigProperties("ENABLE_DB2_DATA");
 		if (eableIncoming.equalsIgnoreCase("Y")) {
 
-			lsSTGUsers = getCustomStgUsers();
+			lsSTGUsers = getCustomStgUsers(false);
 
 			if (lsSTGUsers != null) {
 				System.out.println("Sync to CUSTOM_STG_USER in keycloak");
@@ -106,8 +115,16 @@ public class SchedulerJob extends QuartzJobBean {
 							+ ", AGENT_CODE:" + row[6] + ", AGENCY:" + row[7]
 							+ ", NEED2FA:" + row[8] + ", NEEDTNC:" + row[9]
 							+ ", USER_TYPE:" + row[10] + ", USER_SUB_TYPE:"
-							+ row[11] + ", CREATED_DATE :" + row[12]);
+							+ row[11] + ", CREATED_DATE :" + row[12]
+					        + row[12] + ", ROLE_NAME :" + row[13]);
+					
 					String id_nric = (String) row[0];
+					if(id_nric!=null) {
+						id_nric=id_nric.toUpperCase().trim();
+					}
+					
+//					a.ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, 
+//					AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, a.CREATED_DATE, b.ROLE_NAME
 					String first_name = (String) row[1];
 					String last_name = (String) row[2];
 					String mobile = (String) row[3];
@@ -118,9 +135,38 @@ public class SchedulerJob extends QuartzJobBean {
 					String need2fa = (String) row[8];
 					String needtnc = (String) row[9];
 					String user_type = (String) row[10];
-					String user__sub_type = (String) row[11];
+					if(user_type!=null) {
+						user_type=user_type.toUpperCase().trim();
+					}
+					String user_sub_type = (String) row[11];
+					if(user_sub_type!=null) {
+						user_sub_type=user_type.toUpperCase().trim();
+					}
+					String roles = (String) row[13];
+					System.out.println("roles: "+roles);
+					//check for user type
+					String userTypeId = synDB.getUserTypeId(user_type);
+					if(userTypeId.trim().equals("")) {
+						userTypeId = genearateUDID();
+						synDB.insertCustomUserType(user_type, userTypeId);
+					}
+					
+					//check for sub user type
+					String userSubTypeId = synDB.getUserSubTypeId(user_sub_type);
+					if(userSubTypeId.trim().equals("")) {
+						userSubTypeId = genearateUDID();
+						synDB.insertCustomUserSubType(user_sub_type, userSubTypeId,userTypeId);
+					}
+					else {
+						synDB.updateCustomUserSubType(user_sub_type, userSubTypeId,userTypeId);
+					}
+					
+					System.out.println("userSubTypeId: "+userSubTypeId);
+					System.out.println("userTypeId: "+userTypeId);
+					
 					System.out.println("Check user exist in user entity table");
-					if (synDB.checkExistUserEntity(id_nric) == 0) {
+					String user_id=synDB.getUserEntityByUsername(id_nric);
+					if (user_id.trim().equals("")) {
 						System.out.println("======================");
 						System.out
 								.println("Insert into UserEntity: " + id_nric);
@@ -128,197 +174,71 @@ public class SchedulerJob extends QuartzJobBean {
 						//Insert to User Entity table
 						synDB.insertToUserEntity(id_nric, first_name,
 								last_name, mobile, email, account_status,
-								agent_code, agency, need2fa, needtnc);
+								agent_code, agency, need2fa, needtnc, userTypeId, userSubTypeId);
 					}
+					else {
+						synDB.updateUserEntityByID(first_name, last_name, mobile, email, account_status, agent_code, agency, userTypeId, userSubTypeId, user_id);
+					}
+					
+					//manage app role
+					List<String> lsUserTypeRoles = synDB.getRolesInUserType(user_type);
+					for (String rw : lsUserTypeRoles) {
+						//add user_role_mapping by user_id and role_id (app role set in user type)
+						String role_id = rw;
+						System.out.println("========AND=====role_id: "+role_id);
+						//delete record by user_id and role_id in user_role_mapping 
+						if(role_id != null && !role_id.trim().equals("")){
+							synDB.deleteUserRoleMappingByUserIdRoleId(user_id,role_id);
+							
+							//add user_role_mapping by user_id and role_id (user role)
+							synDB.insertUserRoleMapping(user_id, role_id);
+						}
+					}	
+					
+					//manage user role
+					StringTokenizer st = new StringTokenizer(roles,",");
+					while(st.hasMoreElements()) {
+						String role = (String) st.nextElement();
+						if(role!=null) {
+							role = role.trim().toUpperCase();
+						}
+						
+						//sync keycloak_role by role_name
+						String keycloak_role_id = synDB.getKeycloakRoleByName(role);
+						if (keycloak_role_id.trim().equals("")) {
+							keycloak_role_id = genearateUDID();
+							String realmId = synDB.getPSERealmId();
+							
+							synDB.insertKeycloakRole(keycloak_role_id, realmId,
+									false, role, realmId, null, realmId, false);
+							countRoleProcessed += 1;
+						}
+						System.out.println("========AND=====keycloak_role_id: "+keycloak_role_id);
+						//delete record by user_id and role_id in user_role_mapping 
+						synDB.deleteUserRoleMappingByUserIdRoleId(user_id,keycloak_role_id);
 
-					if (synDB.checkExistStgUser(id_nric) == 0) {
-						noOfRecordInputUser += 1;
-
-						synDB.insertSTGUser(id_nric, first_name, last_name,
-								email, account_status, mobile, agent_code,
-								agency, need2fa, needtnc, user_type,
-								user__sub_type);
+						//add user_role_mapping by user_id and role_id (user role)
+						synDB.insertUserRoleMapping(user_id, keycloak_role_id);
 					}
 				}
 			}
 
 			sNoOfRecordInputUser += noOfRecordInputUser + sNewLine;
-
-			List<Object[]> lsSTGUserRoles = getCustomStgUserRoles();
-			for (Object[] row : lsSTGUserRoles) {
-				String id_nric = (String) row[0];
-				String role_name = (String) row[1];
-				if (synDB.checkExistStgUserRole(id_nric, role_name) == 0) {
-					System.out.println("INSERT TO KEYCLOAK | ID_NRIC:" + row[0]
-							+ ", ROLE_NAME:" + row[1]);
-					synDB.insertSTGUserRole(id_nric, role_name);
-				}
-			}
 		}
 		
-		
-		
-
-		/**
-		 * Check disable sync to keycloak db
-		 */
-		String eableOutgoing = synDB
-				.getConfigProperties("ENABLE_KEYCLOAK_DATA");
-		System.out.println("eableOutgoing: " + eableOutgoing);
-		if (eableOutgoing.equalsIgnoreCase("N")) {
-			return;
-		}
-		
-		
-		/*******************************************************************
-		 * 			SYNC USER ROLES into KEYCLOAK_ROLE (ROLE MASTER TABLE) *
-		 *******************************************************************/
-		
-		List<Object[]> lsNewStgRoles = synDB.getNewRolesFromStg();
-		List<String> newRoleIds = new ArrayList<String>();
-		
-		//Get PSE Realm ID
-		List<Object[]> lsRealmIDs = synDB.getPSERealmId();
-		if (lsRealmIDs.size() > 0) {
-			String realmId = "";
-			String roleName = "";
-			for (Object[] row : lsRealmIDs) {
-				realmId = (String) row[0];
-				break;
-			}
-
-			sNoOfRecordInputRole += lsNewStgRoles.size() + sNewLine;
-			if (lsNewStgRoles.size() > 0 && !realmId.equals("")) {
-				for (Object row : lsNewStgRoles) {
-					roleName = (String) row;
-					if (roleName != null && !roleName.equals("")) {
-						String id = genearateUDID();
-						newRoleIds.add(id);
-						if(roleName.trim().contains(",")){
-							String[] roleNames = roleName.trim().split(",");
-							for (String role : roleNames) {
-								synDB.insertKeycloakRole(id, realmId,
-										false, role, realmId, null, realmId, false);
-								countRoleProcessed += 1;
-							}
-						}else{
-							synDB.insertKeycloakRole(id, realmId,
-									false, roleName, realmId, null, realmId, false);
-							countRoleProcessed += 1;
-						}
-					}
-				}
-
-				countRoleNotProcessed = lsNewStgRoles.size()
-						- countRoleProcessed;
-			}
-		}
-		
-
-
-		
-		/******************************************************************
-		 * 		SYNC USER ROLES INTO USER_ROLE_MAPPING (ASSIGN USER ROLE) *
-		 ******************************************************************/
-
-		List<Object[]> lsSTGUserRoles = getCustomStgUserRoles();
-		for (Object[] row : lsSTGUserRoles) {
-			String id_nric = (String) row[0];
-			String role_name = (String) row[1];
-			String userId = synDB.getNewUserId(id_nric.trim());
-			String role_id = synDB.getRoleIdByName(role_name.trim());
-			System.out.println("Assign role ["+role_id+"] for [" + username+"]");
-			if(!userId.trim().equals("") && !role_id.trim().equals(""))
-				synDB.insertUserRoleMapping(role_id, userId);
-		}
-		
-		
-		/***
-		 * Update custom_user
-		 */
-
-		synDB.insertToCustomUser();
-
-		
-		/********************************************
-		 * 		SYNC USER TYPE AND USER SUBTYPE		*
-		 *******************************************/
-		
-		List<Object[]> lsUserTypeNotMapping = synDB.checkUserTypeNotMapping();
-		System.out.println("Get user type not mapping count: "
-				+ lsUserTypeNotMapping.size());
-
-		StringBuilder sbUserTypeNotInsert = null;
-		for (Object[] row : lsUserTypeNotMapping) {
-			String user_type = (String) row[0];
-			String user_sub_type = (String) row[1];
-			System.out.println("Get user_type:" + user_type
-					+ " - user_sub_type:" + user_sub_type);
-			String userTypeId = genearateUDID();
-
-			int result = synDB.insertCustomUserType(user_type, userTypeId);
-
-			String userSubTypeId = genearateUDID();
-			if (result != -1) {
-				System.out.println("User type " + user_type + " is exist!");
-				synDB.insertCustomUserSubType(user_sub_type, userSubTypeId,
-						userTypeId);
-				System.out.println("Custom user sub type id:" + userSubTypeId);
-			} else {
-				// Send to admin the user type not exist
-				sbUserTypeNotInsert = new StringBuilder();
-				sbUserTypeNotInsert.append(user_type).append("; ");
-			}
-		}
-
-		List<Object[]> lsUserSubTypeNotMapping = synDB
-				.checkUserSubTypeNotMapping();
-		System.out.println("Get user sub type not mapping count: "
-				+ lsUserTypeNotMapping.size());
-		for (Object[] row : lsUserSubTypeNotMapping) {
-			String user_sub_type = (String) row[0];
-			String user_type = (String) row[1];
-			System.out.println("Get user_type: - user_sub_type:"
-					+ user_sub_type);
-			String userSubTypeId = genearateUDID();
-			String userTypeId = synDB.getUserTypeId(user_type);
-			System.out.println("Custom user type id:" + userTypeId);
-			if (!userTypeId.equals("")) {
-				synDB.insertCustomUserSubType(user_sub_type, userSubTypeId,
-						userTypeId);
-				System.out.println("Custom user sub type id:" + userSubTypeId);
-			}
-		}
-
-
-		/********************************************
-		 * UPDATE USER TYPE, SUB TYPE FOR NEW USER	*
-		 *******************************************/
-
-		List<Object[]> lsUserTypeUserNames = synDB.getListUserTypesUserNames();
-		for (Object[] row : lsUserTypeUserNames) {
-			String username = (String) row[0];
-			String userType = (String) row[1];
-			String userSubType = (String) row[2];
-			String userTypeId = synDB.getUserTypeId(userType);
-			String userSubTypeId = synDB.getUserSubTypeId(userSubType);
-			if (!userTypeId.equals("")) {
-				countUserProcessed += 1;
-				synDB.updateUserTypeSubTypeForUserEntity(userTypeId,
-						userSubTypeId, username);
-			}
-		}
-
 		countUserNotProcessed = noOfRecordInputUser - countUserProcessed;
 		
 
 		long endTime = System.currentTimeMillis();
 		long totalTime = endTime - startTime;
 		String sUserTypeNotExist = "";
+		
+		/*
 		if (sbUserTypeNotInsert != null) {
 			sUserTypeNotExist = "UserType not exist: "
 					+ sbUserTypeNotInsert.toString() + sNewLine;
-		}
+		}*/
+		
 		String content = sNoOfRecordInputUser + sNoOfRecordPressedUser
 				+ sNoOfRecordNotPressedUser;
 		content += sNoOfRecordInputRole + sNoOfRecordPressedRole
@@ -342,6 +262,7 @@ public class SchedulerJob extends QuartzJobBean {
 		System.out.println("totalTime: " + totalTime);
 
 	}
+ 
 
 	public static String genearateUDID() {
 		char[] chars = "abcdefghijklmnopqrstuvwxyzABSDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -354,38 +275,56 @@ public class SchedulerJob extends QuartzJobBean {
 		return new String(id);
 	}
 
-	private List<Object[]> getCustomStgUsers() {
+	private List<Object[]> getCustomStgUsers(boolean usedb2) {
 		List<Object[]> listData = new ArrayList<Object[]>();
-
-		String ServerName = synDB.getConfigProperties("SERVER_NAME");
-		int PortNumber = Integer.parseInt(synDB
-				.getConfigProperties("PORT_NUMBER"));
-		String DatabaseName = synDB.getConfigProperties("DATABASE");
-
-		java.util.Properties properties = new java.util.Properties();
-
-		properties.put("user", synDB.getConfigProperties("USER"));
-		properties.put("password", synDB.getConfigProperties("PASSWORD"));
-		properties.put("sslConnection", "true");
-		System.setProperty("javax.net.ssl.trustStore",
-				synDB.getConfigProperties("CACERTS_PATH"));
-		System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
-		System.setProperty("db2.jcc.charsetDecoderEncoder", "3");
-		String url = "jdbc:db2://" + ServerName + ":" + PortNumber + "/"
-				+ DatabaseName;
-
+		String ServerName = "";
+		int PortNumber;
+		String DatabaseName = "";
+		java.util.Properties properties;
+		String url = "";
 		java.sql.Connection con = null;
-		try {
-			new DB2Driver();
-		} catch (Exception e) {
-			System.out.println("Error: failed to load Db2 jcc driver.");
-		}
 
+		if(usedb2) {
+			ServerName = synDB.getConfigProperties("SERVER_NAME");
+			PortNumber = Integer.parseInt(synDB
+					.getConfigProperties("PORT_NUMBER"));
+			DatabaseName = synDB.getConfigProperties("DATABASE");
+			properties = new java.util.Properties();
+			properties.put("user", synDB.getConfigProperties("USER"));
+			properties.put("password", synDB.getConfigProperties("PASSWORD"));
+			properties.put("sslConnection", "true");
+			System.setProperty("javax.net.ssl.trustStore",
+					synDB.getConfigProperties("CACERTS_PATH"));
+			System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+			System.setProperty("db2.jcc.charsetDecoderEncoder", "3");
+			url = "jdbc:db2://" + ServerName + ":" + PortNumber + "/"
+					+ DatabaseName;
+
+			try {
+				new DB2Driver();
+			} catch (Exception e) {
+				System.out.println("Error: failed to load Db2 jcc driver.");
+			}
+		}
+		else {
+			ServerName = synDB.getConfigProperties("SERVER_NAME");
+			PortNumber = Integer.parseInt(synDB
+					.getConfigProperties("PORT_NUMBER"));
+			DatabaseName = synDB.getConfigProperties("DATABASE");
+			
+			properties = new java.util.Properties();
+			properties.put("user", synDB.getConfigProperties("USER"));
+			properties.put("password", synDB.getConfigProperties("PASSWORD"));
+			url = "jdbc:postgresql://" + ServerName + ":" + PortNumber + "/"
+					+ DatabaseName;
+		}
+		
 		try {
 			System.out.println("url: " + url);
 			con = java.sql.DriverManager.getConnection(url, properties);
 			try {
-				String sql = synDB.getConfigProperties("SQL_CUSTOM_STG_USER");
+				String sql = "SELECT a.ID_NRIC, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, USER_TYPE, USER__SUB_TYPE, a.CREATED_DATE, b.ROLE_NAME " 
+						   + "FROM CUSTOM_STG_USER a INNER JOIN CUSTOM_STG_USER_ROLE b ON (b.ID_NRIC=a.ID_NRIC) ";
 				StringBuilder sbSQLSTGUser = new StringBuilder();
 				sbSQLSTGUser.append(sql);
 
@@ -396,9 +335,9 @@ public class SchedulerJob extends QuartzJobBean {
 						.executeQuery(sbSQLSTGUser.toString());
 				System.out.println("get data....");
 
-				Object[] objArrays = new Object[13];
+				Object[] objArrays = new Object[14];
 				while (rs.next()) {
-					objArrays = new Object[13];
+					objArrays = new Object[14];
 					objArrays[0] = rs.getString(1);
 					objArrays[1] = rs.getString(2);
 					objArrays[2] = rs.getString(3);
@@ -412,6 +351,7 @@ public class SchedulerJob extends QuartzJobBean {
 					objArrays[10] = rs.getString(11);
 					objArrays[11] = rs.getString(12);
 					objArrays[12] = rs.getString(13);
+					objArrays[13] = rs.getString(14);
 					listData.add(objArrays);
 					System.out.println("GET FROM DB2 | ID_NRIC:" + objArrays[0]
 							+ ", FIRST_NAME:" + objArrays[1] + ", LAST_NAME:"
@@ -422,90 +362,26 @@ public class SchedulerJob extends QuartzJobBean {
 							+ objArrays[8] + ", NEEDTNC:" + objArrays[9]
 							+ ", USER_TYPE:" + objArrays[10]
 							+ ", USER_SUB_TYPE:" + objArrays[11]
-							+ ", CREATED_DATE :" + objArrays[12]);
+							+ ", CREATED_DATE :" + objArrays[12]
+					        + ", ROLE_NAME :" + objArrays[13]);
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
 				System.out.println("select is failing1");
 			}
 
-			con.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		return listData;
-	}
-
-	private List<Object[]> getCustomStgUserRoles() {
-		List<Object[]> listData = new ArrayList<Object[]>();
-
-		String ServerName = synDB.getConfigProperties("SERVER_NAME");
-		int PortNumber = Integer.parseInt(synDB
-				.getConfigProperties("PORT_NUMBER"));
-		String DatabaseName = synDB.getConfigProperties("DATABASE");
-
-		java.util.Properties properties = new java.util.Properties();
-
-		properties.put("user", synDB.getConfigProperties("USER"));
-		properties.put("password", synDB.getConfigProperties("PASSWORD"));
-		properties.put("sslConnection", "true");
-		System.setProperty("javax.net.ssl.trustStore",
-				synDB.getConfigProperties("CACERTS_PATH"));
-		System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
-		System.setProperty("db2.jcc.charsetDecoderEncoder", "3");
-		String url = "jdbc:db2://" + ServerName + ":" + PortNumber + "/"
-				+ DatabaseName;
-
-		java.sql.Connection con = null;
-		try {
-			new DB2Driver();
-		} catch (Exception e) {
-			System.out.println("Error: failed to load Db2 jcc driver.");
-		}
-
-		try {
-			System.out.println("url: " + url);
-			con = java.sql.DriverManager.getConnection(url, properties);
-			try {
-				String sql = synDB
-						.getConfigProperties("SQL_CUSTOM_STG_USER_ROLE");
-				StringBuilder sbSQLSTGUser = new StringBuilder();
-				sbSQLSTGUser.append(sql);
-
-				System.out
-						.println("Select from PSE.SQL_CUSTOM_STG_USER_ROLE DB2: "
-								+ sbSQLSTGUser.toString());
-				java.sql.Statement ps = con.createStatement();
-				java.sql.ResultSet rs = ps
-						.executeQuery(sbSQLSTGUser.toString());
-				System.out.println("get data....");
-
-				Object[] objArrays = new Object[3];
-				while (rs.next()) {
-					objArrays = new Object[3];
-					objArrays[0] = rs.getString(1);
-					objArrays[1] = rs.getString(2);
-					objArrays[2] = rs.getString(3);
-					listData.add(objArrays);
-					System.out.println("GET FROM DB2 | ID_NRIC:" + objArrays[0]
-							+ ", ROLE_NAME:" + objArrays[1] + ", CREATED_DATE:"
-							+ objArrays[2]);
+			
+			if(con!=null) {
+				try {
+				  con.close();
+				  con = null;
 				}
-			} catch (Exception e) {
-				e.printStackTrace();
-				System.out.println("select is failing1");
+				catch(Exception e) {}
 			}
-
-			con.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		return listData;
-	}
-	
-	public static void main(String args[]) {
-	
 	}
 }

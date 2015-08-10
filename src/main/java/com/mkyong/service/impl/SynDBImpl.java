@@ -37,11 +37,11 @@ public class SynDBImpl implements SynDB, Serializable {
 	public int insertToUserEntity(String ID_NRIC, String FIRST_NAME,
 			String LAST_NAME, String MOBILE, String EMAIL,
 			String ACCOUNT_STATUS, String AGENT_CODE, String AGENCY,
-			String NEED2FA, String NEEDTNC) {
+			String NEED2FA, String NEEDTNC, String USERTYPEID, String USERSUBTYPEID) {
 
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"insertToUserEntity");
-		sqlQuery.setParameter("ID_NRIC", ID_NRIC);
+		sqlQuery.setParameter("ID_NRIC", ID_NRIC.trim());
 		sqlQuery.setParameter("FIRST_NAME", FIRST_NAME);
 		sqlQuery.setParameter("LAST_NAME", LAST_NAME);
 		sqlQuery.setParameter("MOBILE", MOBILE);
@@ -51,6 +51,8 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setParameter("AGENCY", AGENCY);
 		sqlQuery.setParameter("NEED2FA", NEED2FA);
 		sqlQuery.setParameter("NEEDTNC", NEEDTNC);
+		sqlQuery.setParameter("USERTYPEID", USERTYPEID);
+		sqlQuery.setParameter("USERSUBTYPEID", USERSUBTYPEID);
 
 		return sqlQuery.executeUpdate();
 	}
@@ -144,6 +146,30 @@ public class SynDBImpl implements SynDB, Serializable {
 		}
 		return returnFilterList;
 	}
+	
+	public List<String> getRolesInUserType(String userType) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getRolesInUserType");
+		String role_id = "";
+		
+		sqlQuery.setString("userType", userType);
+		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
+		List<String> returnFilterList = new ArrayList<String>();
+		for (Object[] row : returnList) {
+			role_id = (String) row[0];
+		    returnFilterList.add(role_id);
+		}
+		return returnFilterList;
+	}
+	
+	public List<Object[]> getUserEntityByName(String username) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getUserEntityByName");
+		String user_type = "";
+		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
+	 
+		return returnList;
+	}
 
 	public String getRoleId(String rolename) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
@@ -160,6 +186,18 @@ public class SynDBImpl implements SynDB, Serializable {
 			}
 		}
 		return role_id;
+	}
+	
+	public String getUserEntityByUsername(String username) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getUserEntityByUsername");
+		String user_id = "";
+		sqlQuery.setString("username", username);
+		List<String> returnList = (List<String>) sqlQuery.list();
+		for (String row : returnList) {
+			user_id = row;
+		}
+		return user_id;
 	}
 
 	public boolean getUserRoleMapping(String roleId, String userId) {
@@ -183,18 +221,21 @@ public class SynDBImpl implements SynDB, Serializable {
 		return isExist;
 	}
 
-	public int insertUserRoleMapping(String role_id, String user_id) {
-		if (!getUserRoleMapping(role_id, user_id)) {
-			Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
-					"insertUserRoleMapping");
-			sqlQuery.setParameter("role_id", role_id);
-			sqlQuery.setParameter("user_id", user_id);
-			System.out.println("Insert new role '" + role_id + "' for user "
-					+ user_id);
-			return sqlQuery.executeUpdate();
-		} else {
-			return -1;
-		}
+	public int insertUserRoleMapping(String user_id, String keycloak_role_id) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"insertUserRoleMapping");
+		sqlQuery.setParameter("user_id", user_id);
+		sqlQuery.setParameter("keycloak_role_id", keycloak_role_id); 
+		return sqlQuery.executeUpdate();
+	}
+	
+	public int  updateCustomUserSubType(String user_sub_type, String userSubTypeId, String userTypeId) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"updateCustomUserSubType");
+		sqlQuery.setParameter("user_sub_type", user_sub_type);
+		sqlQuery.setParameter("userTypeId", userTypeId);
+		sqlQuery.setParameter("userSubTypeId", userSubTypeId); 
+		return sqlQuery.executeUpdate();
 	}
 
 	public String getNewUserId(String username) {
@@ -297,29 +338,21 @@ public class SynDBImpl implements SynDB, Serializable {
 	}
 
 	public int insertCustomUserType(String userType, String uuid) {
-		if (!checkExistUserType(userType)) {
-			Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
-					"insertToCustomUserType");
-			sqlQuery.setParameter("user_type", userType);
-			sqlQuery.setParameter("uuid", uuid);
-			return sqlQuery.executeUpdate();
-		} else {
-			return -1;
-		}
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"insertToCustomUserType");
+		sqlQuery.setParameter("user_type", userType);
+		sqlQuery.setParameter("uuid", uuid);
+		return sqlQuery.executeUpdate();
 	}
 
 	public int insertCustomUserSubType(String userSubType, String ID,
 			String userTypeId) {
-		if (!checkExistUserSubType(userSubType)) {
-			Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
-					"insertToCustomUserSubType");
-			sqlQuery.setParameter("user_sub_type", userSubType);
-			sqlQuery.setParameter("custom_user_type_id", userTypeId);
-			sqlQuery.setParameter("id", ID);
-			return sqlQuery.executeUpdate();
-		} else {
-			return -1;
-		}
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"insertToCustomUserSubType");
+		sqlQuery.setParameter("user_sub_type", userSubType);
+		sqlQuery.setParameter("custom_user_type_id", userTypeId);
+		sqlQuery.setParameter("id", ID);
+		return sqlQuery.executeUpdate();
 	}
 
 	public List<Object[]> checkUserSubTypeNotMapping() {
@@ -420,12 +453,28 @@ public class SynDBImpl implements SynDB, Serializable {
 		}
 		return role_id;
 	}
+	
+	public String getKeycloakRoleByName(String role){
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"getKeycloakRoleByName");
+		sqlQuery.setString("role", role);
+		List<String> returnList = (List<String>) sqlQuery.list();
+		for (String row : returnList) {
+			return row;
+		}
+		return null;
+	}
 
-	public List<Object[]> getPSERealmId() {
+	public String getPSERealmId() {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"getPSERealmId");
-		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
-		return returnList;
+		List<String> returnList = (List<String>) sqlQuery.list();
+		String realm_id = "";
+		for (String row : returnList) {
+			realm_id = row;
+		}
+	 
+		return realm_id;
 	}
 
 	public List<Object[]> getListAppsBelongRealm() {
@@ -473,6 +522,22 @@ public class SynDBImpl implements SynDB, Serializable {
 		sqlQuery.setString("user_name", username);
 		return sqlQuery.executeUpdate();
 	}
+	
+	public int updateUserEntityByID(String first_name, String last_name, String mobile, String email, String account_status, String agent_code, String agency, String user_type_id, String user_subtype_id, String user_id) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"updateUserEntityByID");
+		sqlQuery.setString("first_name", first_name);
+		sqlQuery.setString("last_name", last_name);
+		sqlQuery.setString("mobile", mobile);
+		sqlQuery.setString("email", email);
+		sqlQuery.setString("account_status", account_status);
+		sqlQuery.setString("agent_code", agent_code);
+		sqlQuery.setString("agency", agency);
+		sqlQuery.setString("user_type_id", user_type_id);
+		sqlQuery.setString("user_subtype_id", user_subtype_id);
+		sqlQuery.setString("user_id", user_id);
+		return sqlQuery.executeUpdate();
+	}
 
 	public int checkExistStgUser(String username) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
@@ -516,6 +581,14 @@ public class SynDBImpl implements SynDB, Serializable {
 	public int deleteSubType() {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"deleteSubType");
+		return sqlQuery.executeUpdate();
+	}
+	
+	public int deleteUserRoleMappingByUserIdRoleId(String user_id, String role_id) {
+		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
+				"deleteUserRoleMappingByUserIdRoleId");
+		sqlQuery.setString("user_id", user_id);
+		sqlQuery.setString("role_id", role_id);
 		return sqlQuery.executeUpdate();
 	}
 

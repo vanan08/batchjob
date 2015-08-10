@@ -7,9 +7,18 @@
    		SELECT * FROM qrtz_cron_triggers
 	</sql-query>
 	
+	<sql-query name="getRolesInUserType" read-only="true">
+   		<![CDATA[SELECT A.ROLE_ID FROM CUSTOM_USER_TYPE_APP_ROLE A WHERE EXISTS(SELECT * FROM CUSTOM_USER_TYPE B WHERE B.ID=A.CUSTOM_USER_TYPE_ID AND USER_TYPE=UPPER(TRIM(:userType)))]]>
+	</sql-query>
+	
 	<sql-query name="getRoleIdByName" read-only="true">
 			<![CDATA[SELECT cast(id AS text) role_id, cast(name AS text) role_name FROM keycloak_role
 			where trim(name) = trim(:role_name)]]>
+    </sql-query>
+    
+    <sql-query name="getKeycloakRoleByName" read-only="true">
+			<![CDATA[SELECT cast(id AS text) role_id FROM keycloak_role
+			where application_role=false and upper(trim(name)) = upper(trim(:role))]]>
     </sql-query>
     
 	<sql-query name="checkExistStgUser" read-only="true">
@@ -39,6 +48,10 @@
 	<sql-query name="updateUserTypeSubTypeForUserEntity" read-only="true">
    		<![CDATA[update user_entity set custom_user_type_id = :custom_user_type_id
    		, custom_user_subtype_id = :custom_user_subtype_id where trim(username) = trim(:user_name)]]>
+	</sql-query>
+	
+	<sql-query name="updateCustomUserSubType" read-only="true">
+   		<![CDATA[UPDATE CUSTOM_USER_SUBTYPE SET USER_SUB_TYPE=:user_sub_type, CUSTOM_USER_TYPE_ID=:userTypeId WHERE ID=:userSubTypeId]]>
 	</sql-query>
 	
 	<sql-query name="insertSTGUserRole" read-only="true">
@@ -78,6 +91,10 @@
 			FROM
 			USER_ENTITY WHERE ID NOT IN (SELECT USER_ENTITY_ID FROM CUSTOM_USER)
    		);
+	</sql-query>
+	
+	<sql-query name="getUserEntityByName" read-only="true">
+   		  <![CDATA[SELECT * FROM userentity WHERE trim(username)=trim(:username)]]>
 	</sql-query>
 	
 	<sql-query name="getUserTypeRoles" read-only="true">
@@ -168,7 +185,7 @@
     </sql-query>
     
     <sql-query name="getPSERealmId" read-only="true">
-			SELECT cast(id AS text) as realm_id, cast(name AS text) as realm FROM realm r WHERE name='pse';
+			SELECT cast(id AS text) as realm_id FROM realm r WHERE name='pse';
     </sql-query>
     
     <sql-query name="getListAppsBelongRealm" read-only="true">
@@ -185,8 +202,8 @@
      
       <sql-query name="insertUserRoleMapping" read-only="true">
     			INSERT INTO user_role_mapping(
-            	role_id, user_id)
-    			VALUES (:role_id, :user_id);						
+            	user_id,role_id)
+    			VALUES (:user_id, :keycloak_role_id);						
      </sql-query>
      
       <sql-query name="getUserRoleMapping" read-only="true">
@@ -197,18 +214,27 @@
 			SELECT cast(id AS text) role_id, cast(name AS text) role_name FROM keycloak_role;
     </sql-query>
     <sql-query name="insertToUserEntity" read-only="true">
-	    INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, CREATED_DATE)
+	   INSERT INTO USER_ENTITY(ID, REALM_ID, USERNAME, FIRST_NAME, LAST_NAME, MOBILE, EMAIL, 
+	    ACCOUNT_STATUS, AGENT_CODE, AGENCY, NEED2FA, NEEDTNC, 
+	    CREATED_DATE, CUSTOM_USER_TYPE_ID,CUSTOM_USER_SUBTYPE_ID)
 		VALUES(
 			uuid_in(cast(md5(cast(random() AS text) || cast(now() AS text)) as cstring)), 
 			(SELECT ID FROM REALM WHERE lower(NAME) = 'pse'),
-			trim(:ID_NRIC), trim(:FIRST_NAME), trim(:LAST_NAME), trim(:MOBILE), trim(:EMAIL), trim(:ACCOUNT_STATUS),
-			trim(:AGENT_CODE), trim(:AGENCY), trim(:NEED2FA), trim(:NEEDTNC), 
-			cast(now() AS timestamp)
+			:ID_NRIC, :FIRST_NAME, :LAST_NAME, :MOBILE, :EMAIL, :ACCOUNT_STATUS,
+			:AGENT_CODE, :AGENCY, :NEED2FA, :NEEDTNC, cast(now() AS timestamp), :USERTYPEID, :USERSUBTYPEID
 		)
+	</sql-query>
+	
+	<sql-query name="updateUserEntityByID" read-only="true">
+	    <![CDATA[UPDATE USER_ENTITY SET FIRST_NAME=trim(:first_name),LAST_NAME=:last_name,MOBILE=:mobile,EMAIL=:email,ACCOUNT_STATUS=:account_status,AGENT_CODE=:agent_code,AGENCY=:agency,CUSTOM_USER_TYPE_ID=:user_type_id, CUSTOM_USER_SUBTYPE_ID=:user_subtype_id WHERE ID=trim(:user_id)]]>
 	</sql-query>
 	
 	<sql-query name="checkExistUserEntity" read-only="true">
 	    <![CDATA[SELECT * FROM USER_ENTITY WHERE username=:username]]>
+	</sql-query>
+	
+	<sql-query name="getUserEntityByUsername" read-only="true">
+	    <![CDATA[SELECT id FROM USER_ENTITY WHERE username=:username]]>
 	</sql-query>
 	
 	<sql-query name="clearUserTypeSubType" read-only="true">
@@ -216,11 +242,15 @@
 	</sql-query>
 	
 	<sql-query name="deleteSubType" read-only="true">
-	    <![CDATA[DELETE CUSTOM_USER_SUBTYPE]]>
+	    <![CDATA[DELETE FROM CUSTOM_USER_SUBTYPE]]>
 	</sql-query>
 	
 	<sql-query name="deleteUserType" read-only="true">
-	    <![CDATA[DELETE CUSTOM_USER_TYPE]]>
+	    <![CDATA[DELETE FROM CUSTOM_USER_TYPE]]>
+	</sql-query>
+	
+	<sql-query name="deleteUserRoleMappingByUserIdRoleId" read-only="true">
+	    <![CDATA[DELETE FROM USER_ROLE_MAPPING WHERE USER_ID=:user_id AND ROLE_ID=:role_id]]>
 	</sql-query>
 	
 	<sql-query name="checkUserType" read-only="true">
