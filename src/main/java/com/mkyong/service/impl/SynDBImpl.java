@@ -153,10 +153,10 @@ public class SynDBImpl implements SynDB, Serializable {
 		String role_id = "";
 		
 		sqlQuery.setString("userType", userType);
-		List<Object[]> returnList = (List<Object[]>) sqlQuery.list();
+		List<String> returnList = (List<String>) sqlQuery.list();
 		List<String> returnFilterList = new ArrayList<String>();
-		for (Object[] row : returnList) {
-			role_id = (String) row[0];
+		for (String row : returnList) {
+			role_id = row;
 		    returnFilterList.add(role_id);
 		}
 		return returnFilterList;

@@ -8,7 +8,7 @@
 	</sql-query>
 	
 	<sql-query name="getRolesInUserType" read-only="true">
-   		<![CDATA[SELECT A.ROLE_ID FROM CUSTOM_USER_TYPE_APP_ROLE A WHERE EXISTS(SELECT * FROM CUSTOM_USER_TYPE B WHERE B.ID=A.CUSTOM_USER_TYPE_ID AND USER_TYPE=UPPER(TRIM(:userType)))]]>
+   		<![CDATA[SELECT cast(A.ROLE_ID AS text) FROM CUSTOM_USER_TYPE_APP_ROLE A WHERE EXISTS(SELECT * FROM CUSTOM_USER_TYPE B WHERE B.ID=A.CUSTOM_USER_TYPE_ID AND USER_TYPE=UPPER(TRIM(:userType)))]]>
 	</sql-query>
 	
 	<sql-query name="getRoleIdByName" read-only="true">
