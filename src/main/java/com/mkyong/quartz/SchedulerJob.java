@@ -205,7 +205,7 @@ public class SchedulerJob extends QuartzJobBean {
 						
 						//sync keycloak_role by role_name
 						String keycloak_role_id = synDB.getKeycloakRoleByName(role);
-						if (keycloak_role_id.trim().equals("")) {
+						if (keycloak_role_id != null && keycloak_role_id.trim().equals("")) {
 							keycloak_role_id = genearateUDID();
 							String realmId = synDB.getPSERealmId();
 							
