@@ -140,7 +140,7 @@ public class SchedulerJob extends QuartzJobBean {
 					}
 					String user_sub_type = (String) row[11];
 					if(user_sub_type!=null) {
-						user_sub_type=user_type.toUpperCase().trim();
+						user_sub_type=user_sub_type.toUpperCase().trim();
 					}
 					String roles = (String) row[13];
 					System.out.println("roles: "+roles);
