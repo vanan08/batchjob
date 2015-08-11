@@ -30,7 +30,7 @@ public interface SynDB{
 	public List< String> getRolesInUserType(String user_type);
 	public int updateCustomUserSubType(String user_sub_type, String userSubTypeId, String userTypeId);
 	
-	public int deleteUserRoleMappingByUserIdRoleId(String user_id, String keycloak_role_id);
+	public int deleteUserRoleMappingByUserIdRoleId(String user_id);
 	
 	public int insertKeycloakRole(String id, String app_realm_constraint, boolean application_role, String name, 
     		String realm_id, String application, String realm, boolean state);

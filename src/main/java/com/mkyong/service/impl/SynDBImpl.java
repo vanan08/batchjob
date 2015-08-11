@@ -584,11 +584,10 @@ public class SynDBImpl implements SynDB, Serializable {
 		return sqlQuery.executeUpdate();
 	}
 	
-	public int deleteUserRoleMappingByUserIdRoleId(String user_id, String role_id) {
+	public int deleteUserRoleMappingByUserIdRoleId(String user_id) {
 		Query sqlQuery = sessionFactory.getCurrentSession().getNamedQuery(
 				"deleteUserRoleMappingByUserIdRoleId");
 		sqlQuery.setString("user_id", user_id);
-		sqlQuery.setString("role_id", role_id);
 		return sqlQuery.executeUpdate();
 	}
 
